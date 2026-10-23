@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.5.5-fork
+// @version      2.6.0-fork
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.5.5 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
+// @description  Fork de Torn Oracle: Travel 2.6.0 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -265,8 +265,8 @@ const Data = (() => {
   const CODE_BY_NAME = {};
   for (const c of Object.values(COUNTRIES)) CODE_BY_NAME[c.name.toLowerCase()] = c.code;
 
-  const TRAVEL_BY_RADIO = {};
-  TYPE_ORDER.forEach((code, i) => { TRAVEL_BY_RADIO[String(i + 1)] = code; });
+  const TRAVEL_BY_INDEX = {};
+  TYPE_ORDER.forEach((code, i) => { TRAVEL_BY_INDEX[String(i + 1)] = code; });
 
   function flightMinutes(code, travelType) {
     const c = COUNTRIES[code];
@@ -335,7 +335,7 @@ const Data = (() => {
 
   return {
     TYPE_ORDER, TRAVEL_TYPES, COUNTRIES, CODE_BY_NAME, ITEM_TYPES,
-    DEFAULT_ITEM_TYPES, TRAVEL_BY_RADIO,
+    DEFAULT_ITEM_TYPES, TRAVEL_BY_INDEX,
     codes: () => Object.keys(COUNTRIES),
     list: () => Object.values(COUNTRIES),
     flightMinutes, profitPerMinute, unitSell, margin, channel, label, name, flag, itemType,
@@ -443,7 +443,7 @@ const Settings = (() => {
       label: "24-hour clock" },
     { name: "follow_page", group: "display", kind: "bool", def: true,
       label: "Follow the page",
-      help: "The Shops tab shows the country you pick on Torn." },
+      help: "The Shops tab shows the country you pick on Torn. Plans use your flight type and free travel slots." },
   ];
 
   const BY_NAME = {};
@@ -642,7 +642,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.5.5";
+  const SCRIPT_VERSION = "2.6.0";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -797,6 +797,8 @@ const Oracle = (() => {
     return get("/forecasts/" + encodeURIComponent(code) + "?" + q).then((r) => r.data);
   };
 
+  const exports = () => get("/exports").then((r) => r.data);
+
   const board = ({ travel } = {}) => {
     const q = dials(new URLSearchParams());
     if (travel != null) q.set("travel", travel);
@@ -846,7 +848,7 @@ const Oracle = (() => {
   return {
     HOST, OracleError,
     haveToken, health, friendly,
-    me, countries, shop, itemStock, forecasts, board,
+    me, countries, shop, itemStock, forecasts, board, exports,
     watches, addWatch, removeWatch,
     tokensList, tokenCreate, tokenDelete,
     putTrip, clearTrip, heartbeat,
@@ -3931,14 +3933,34 @@ const Page = (() => {
     return "other";
   }
 
+  const TYPE_OPTION_RE = /^option-(?:Standard|Airstrip|Private|Business)-([1-4])$/;
+  const DEST_OPTION_RE = /^option-[A-Za-z-]+-(\d+)$/;
+
   function agencyOnPage() {
-    return !!(document.querySelector('input[name="travelType"]')
-              || hasMap()
-              || document.querySelector('button[aria-controls^="travel-country-"]'));
+    return !!(document.querySelector('button[aria-label="Next flight type"]')
+              || typeOptions().length
+              || mapPins().length);
+  }
+
+  function options() {
+    return [...document.querySelectorAll('li[role="option"][id^="option-"]')];
+  }
+
+  function typeOptions() {
+    return options().filter((li) => TYPE_OPTION_RE.test(li.id));
+  }
+
+  function destinationOptions() {
+    return options().filter((li) => !TYPE_OPTION_RE.test(li.id) && DEST_OPTION_RE.test(li.id));
+  }
+
+  function mapPins() {
+    return [...document.querySelectorAll("button[aria-pressed][aria-label]")]
+      .filter((b) => codeFromText(b.getAttribute("aria-label")));
   }
 
   function hasMap() {
-    return !!document.querySelector('input[name="destination"]');
+    return destinationOptions().length > 0 || mapPins().length > 0;
   }
 
   function blockedAgencyOnPage() {
@@ -3994,8 +4016,8 @@ const Page = (() => {
   }
 
   function selectedTravelType() {
-    const checked = document.querySelector('input[name="travelType"]:checked');
-    return checked ? (Data.TRAVEL_BY_RADIO[checked.value] || null) : null;
+    const li = typeOptions().find((o) => o.getAttribute("aria-selected") === "true");
+    return li ? (Data.TRAVEL_BY_INDEX[TYPE_OPTION_RE.exec(li.id)[1]] || null) : null;
   }
 
   function codeFromText(text) {
@@ -4007,24 +4029,28 @@ const Page = (() => {
     return null;
   }
 
+  function codeFromOption(li) {
+    const m = DEST_OPTION_RE.exec(li.id);
+    return m ? (CODE_BY_TORN_ID[m[1]] || null) : null;
+  }
+
   function selectedDestination() {
-    const checked = document.querySelector('input[name="destination"]:checked');
-    if (!checked) return null;
-    return codeFromText((checked.getAttribute("aria-label") || "").split(" - ")[0]);
+    const li = destinationOptions().find((o) => o.getAttribute("aria-selected") === "true");
+    if (li) return codeFromOption(li);
+    const pin = mapPins().find((b) => b.getAttribute("aria-pressed") === "true");
+    return pin ? codeFromText(pin.getAttribute("aria-label")) : null;
   }
 
   const TORN_IDS = { mex: 2, haw: 3, sou: 4, jap: 5, chi: 6, arg: 7, swi: 8,
                      can: 9, uni: 10, uae: 11, cay: 12 };
+  const CODE_BY_TORN_ID = {};
+  for (const [code, id] of Object.entries(TORN_IDS)) CODE_BY_TORN_ID[String(id)] = code;
 
   function destinationControl(code) {
-    for (const radio of document.querySelectorAll('input[name="destination"]')) {
-      if (codeFromText((radio.getAttribute("aria-label") || "").split(" - ")[0]) === code) {
-        return { kind: "radio", el: radio };
-      }
-    }
-    const btn = TORN_IDS[code]
-      && document.querySelector('button[aria-controls="travel-country-' + TORN_IDS[code] + '"]');
-    return btn ? { kind: "button", el: btn } : null;
+    const pin = mapPins().find((b) => codeFromText(b.getAttribute("aria-label")) === code);
+    if (pin) return { el: pin, chosen: () => pin.getAttribute("aria-pressed") === "true" };
+    const li = destinationOptions().find((o) => codeFromOption(o) === code);
+    return li ? { el: li, chosen: () => li.getAttribute("aria-selected") === "true" } : null;
   }
 
   function canPreselect(code) {
@@ -4034,11 +4060,7 @@ const Page = (() => {
   function preselect(code, scroll = true) {
     const found = mode() === "agency" ? destinationControl(code) : null;
     if (!found) return false;
-    if (found.kind === "radio") {
-      if (!found.el.checked) found.el.click();
-    } else if (found.el.getAttribute("aria-expanded") !== "true") {
-      found.el.click();
-    }
+    if (!found.chosen()) found.el.click();
     if (scroll) found.el.scrollIntoView({ block: "center", behavior: "smooth" });
     return true;
   }
@@ -4075,11 +4097,7 @@ const Page = (() => {
 
   document.addEventListener("click", (ev) => {
     if (!linked || !ev.isTrusted || !ev.target.closest) return;
-    const label = ev.target.closest("label");
-    if (ev.target.closest('input[name="destination"], button[aria-controls^="travel-country-"]')
-        || (label && label.querySelector('input[name="destination"]'))) {
-      linked = null;
-    }
+    if (ev.target.closest('li[role="option"], button[aria-pressed]')) linked = null;
   }, true);
 
   function darkMode() {
@@ -4106,28 +4124,50 @@ const Page = (() => {
   }
 
   function onFormChange(fn) {
-    document.addEventListener("change", (ev) => {
-      const name = ev.target && ev.target.name;
-      if (name === "travelType") fn(name, ev.target.value);
-      if (name === "destination") {
-        const code = codeFromText(
-          (ev.target.getAttribute("aria-label") || "").split(" - ")[0]
-        );
-        if (code) fn(name, code);
-      }
-    }, true);
+    let type = selectedTravelType();
+    let dest = selectedDestination();
+    let packed = inventoryKey(travelInventory());
+    let timer = null;
+    const check = () => {
+      timer = null;
+      const t = selectedTravelType();
+      if (t && t !== type) fn("travelType", t);
+      type = t || type;
+      const d = selectedDestination();
+      if (d && d !== dest) fn("destination", d);
+      dest = d || dest;
+      const inv = travelInventory();
+      const k = inventoryKey(inv);
+      if (inv && k !== packed) fn("inventory", inv);
+      packed = k;
+    };
+    const later = (ev) => {
+      if (!ev.isTrusted || mode() !== "agency") return;
+      clearTimeout(timer);
+      timer = setTimeout(check, 250);
+    };
+    document.addEventListener("click", later, true);
+    document.addEventListener("keyup", later, true);
+    check();
+    return check;
+  }
 
-    document.addEventListener("click", (ev) => {
-      const btn = ev.target.closest('button[aria-controls^="travel-country-"]');
-      if (!btn) return;
-      const code = codeFromText(btn.textContent);
-      if (code) fn("destination", code);
-    }, true);
+  function travelInventory() {
+    const list = document.querySelector('ul[aria-label^="Inventory"]');
+    if (!list) return null;
+    const slots = list.querySelectorAll(":scope > li").length;
+    const m = /(\d+)/.exec(list.getAttribute("aria-label") || "");
+    if (!slots || !m) return null;
+    return { slots, packed: Number(m[1]) };
+  }
+
+  function inventoryKey(inv) {
+    return inv ? inv.slots + "/" + inv.packed : "";
   }
 
   return {
     PANEL_ID, mode, agencyOnPage, hasMap, place, watch, onFormChange,
-    selectedTravelType, selectedDestination, darkMode,
+    selectedTravelType, selectedDestination, travelInventory, darkMode,
     canPreselect, preselect, travelLink, followLink,
   };
 })();
@@ -7561,6 +7601,78 @@ const ViewSettings = (() => {
   return { id: "settings", label: "Settings", render, reveal, tick: () => { }, badge: () => null };
 })();
 
+const ViewExports = (() => {
+  "use strict";
+
+  const ROW_CAP = 14;
+
+  let data = null;
+  let loading = false;
+  let error = null;
+  let expanded = false;
+
+  async function load(force) {
+    if (!Oracle.haveToken() || loading) return;
+    if (!force && data && Date.now() - data.at < 45_000) return;
+    loading = true;
+    error = null;
+    Panel.refresh("exports");
+    try {
+      const payload = await Oracle.exports();
+      data = { rows: payload.exports || [], at: Date.now() };
+    } catch (err) {
+      error = err.message;
+    } finally {
+      loading = false;
+      Panel.refresh("exports");
+    }
+  }
+
+  function render(el) {
+    if (!Oracle.haveToken()) {
+      el.innerHTML = Gate.account("see what foreign shops pay");
+      Gate.wire(el);
+      return;
+    }
+    if (loading && !data) { el.innerHTML = `<div class="o-empty">Reading the shops…</div>`; return; }
+    if (error) { el.innerHTML = `<div class="o-note is-warn">${Fmt.esc(error)}</div>`; return; }
+    if (!data) { el.innerHTML = `<div class="o-empty">Nothing loaded yet.</div>`; load(); return; }
+    if (!data.rows.length) {
+      el.innerHTML = `<div class="o-empty">No foreign shop pays more than Torn's market value right now.</div>`;
+      return;
+    }
+    const cap = Settings.get("capacity");
+    const shown = expanded ? data.rows : data.rows.slice(0, ROW_CAP);
+    const rows = shown.map((r) => {
+      const c = Data.COUNTRIES[r.country];
+      return `<tr>
+        <td>${Fmt.esc(r.name)}<span class="o-sub">${Fmt.esc(c ? c.flag + " " + c.name : r.country)}</span></td>
+        <td class="num">${Fmt.esc(Fmt.price(r.pays))}<span class="o-sub">Torn ${Fmt.esc(Fmt.price(r.market_value))}</span></td>
+        <td class="num"><span class="go">+${Fmt.esc(Fmt.price(r.margin))}</span>
+          <span class="o-sub">${Fmt.esc(Fmt.money(r.margin * cap))} for ${Fmt.esc(Fmt.count(cap))}</span></td>
+        <td class="num">${Fmt.esc(Fmt.count(r.quantity))}</td>
+      </tr>`;
+    }).join("");
+    const more = data.rows.length > ROW_CAP
+      ? `<button type="button" class="o-btn" data-act="expand">${expanded ? "Fewer" : "All " + data.rows.length}</button>`
+      : "";
+    el.innerHTML = `<div class="o-scroll"><table>
+        <thead><tr><th>Item</th><th class="num">Shop pays</th><th class="num">Profit</th><th class="num">On shelf</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+      <div class="o-acts">${more}</div>
+      <div class="o-note">Buy in Torn and sell to the shop abroad. A Black Market pays its
+        current price. Other shops pay 75% of theirs.</div>`;
+    const expand = el.querySelector('[data-act="expand"]');
+    if (expand) expand.addEventListener("click", () => { expanded = !expanded; Panel.refresh("exports"); });
+  }
+
+  return {
+    id: "exports", label: "Exports", render, load,
+    badge: () => null,
+    refresh: (force) => load(force), refreshEvery: 60_000,
+  };
+})();
+
 Env.ready().then(function boot() {
   "use strict";
 
@@ -7571,6 +7683,7 @@ Env.ready().then(function boot() {
 
   Panel.register(ViewToday);
   Panel.register(ViewShops);
+  Panel.register(ViewExports);
   Panel.register(ViewItems);
   Panel.register(ViewWatches);
   Panel.register(ViewMuseum);
@@ -7599,17 +7712,22 @@ Env.ready().then(function boot() {
   Panel.paintHead();
   Panel.badges();
 
-  Page.watch((next) => { applyMode(next); placePanel(); });
+  let readForm = () => {};
+  Page.watch((next) => { applyMode(next); placePanel(); readForm(); });
   Page.followLink();
 
   window.addEventListener("hashchange", Page.followLink);
 
-  Page.onFormChange((name, value) => {
+  readForm = Page.onFormChange((name, value) => {
     if (!Settings.get("follow_page")) return;
     if (name === "travelType") {
+      Settings.set("travel_type", value);
+      Panel.refresh();
+    }
+    if (name === "inventory") {
 
-      const code = Data.TRAVEL_BY_RADIO[value];
-      if (code) { Settings.set("travel_type", code); Panel.refresh(); }
+      const free = Math.max(1, value.slots - value.packed);
+      if (Settings.get("capacity") !== free) { Settings.set("capacity", free); Panel.refresh(); }
     }
     if (name === "destination") {
 
