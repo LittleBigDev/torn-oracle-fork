@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.0-fork
+// @version      2.6.1-fork
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.0 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
+// @description  Fork de Torn Oracle: Travel 2.6.1 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -371,6 +371,11 @@ const Settings = (() => {
       unit: "h", sync: "end_hours",
       label: "Plan ahead",
       help: "How far ahead a plan reaches, up to 16 hours." },
+    { name: "landing_aim", group: "trips", kind: "choice", def: "auto",
+      choices: () => [["auto", "Automatic"], ["restock", "Start of the restock window"],
+                      ["stock", "When stock is likely there"]],
+      label: "Landing time",
+      help: "The restock window start lands you early to wait in hospital. Automatic picks it when the Assist tab has a self-hosp item." },
     { name: "drug_priority", group: "trips", kind: "bool", def: false, sync: "drug_priority",
       label: "Plan around drug cooldown",
       help: "Times a departure for when your drug cooldown ends." },
@@ -430,6 +435,12 @@ const Settings = (() => {
       label: "Show my plan on Discord",
       help: "Posts your plan to your Discord thread or DMs and updates it when you re-plan." },
 
+    { name: "assist_kit", group: "assist", kind: "kit", hidden: true,
+      def: { hosp: null, med: null, meds: 0 },
+      label: "Trip kit" },
+    { name: "assist_track", group: "assist", kind: "itemrefs", def: [], hidden: true,
+      label: "Tracked items" },
+
     { name: "collapsed", group: "display", kind: "bool", def: false, hidden: true,
       label: "Panel collapsed" },
     { name: "tab", group: "display", kind: "string", def: "today", hidden: true,
@@ -445,6 +456,9 @@ const Settings = (() => {
       label: "Follow the page",
       help: "The Shops tab shows the country you pick on Torn. Plans use your flight type and free travel slots." },
   ];
+
+  const MAX_MEDS = 20;
+  const MAX_TRACKED = 10;
 
   const BY_NAME = {};
   for (const row of SCHEMA) BY_NAME[row.name] = row;
@@ -528,12 +542,33 @@ const Settings = (() => {
         }
         return out;
       }
+      case "kit": {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+        const meds = Math.round(Number(raw.meds));
+        return { hosp: itemRef(raw.hosp), med: itemRef(raw.med),
+                 meds: isFinite(meds) ? Math.min(Math.max(meds, 0), MAX_MEDS) : 0 };
+      }
+      case "itemrefs": {
+        if (!Array.isArray(raw)) return undefined;
+        const out = [];
+        for (const ref of raw.map(itemRef)) {
+          if (ref && !out.some((o) => o.id === ref.id)) out.push(ref);
+        }
+        return out.slice(0, MAX_TRACKED);
+      }
       case "secret":
       case "string":
         return typeof raw === "string" ? raw : undefined;
       default:
         return undefined;
     }
+  }
+
+  function itemRef(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const id = Number(raw.id);
+    const name = typeof raw.name === "string" ? raw.name.trim() : "";
+    return Number.isInteger(id) && id > 0 && name ? { id, name } : null;
   }
 
   function all() {
@@ -623,15 +658,20 @@ const Settings = (() => {
     return { applied, skipped };
   }
 
+  function aimAtRestock() {
+    const aim = get("landing_aim");
+    return aim === "restock" || (aim === "auto" && !!get("assist_kit").hosp);
+  }
+
   function planCountries() {
     const chosen = get("plan_countries");
     return chosen && chosen.length ? chosen.slice() : Data.codes();
   }
 
   return {
-    SCHEMA, BY_NAME, VERSION,
+    SCHEMA, BY_NAME, VERSION, MAX_MEDS, MAX_TRACKED,
     load, all, get, set, apply, sync, onChange, exportSafe, exportShared, importShared,
-    planCountries,
+    planCountries, aimAtRestock,
     groups: () => ["account", "trips", "buying", "forecast", "alerts", "display"],
   };
 })();
@@ -642,7 +682,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.0";
+  const SCRIPT_VERSION = "2.6.1";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -799,6 +839,8 @@ const Oracle = (() => {
 
   const exports = () => get("/exports").then((r) => r.data);
 
+  const announcements = () => get("/announcements").then((r) => r.data.announcements);
+
   const board = ({ travel } = {}) => {
     const q = dials(new URLSearchParams());
     if (travel != null) q.set("travel", travel);
@@ -848,7 +890,7 @@ const Oracle = (() => {
   return {
     HOST, OracleError,
     haveToken, health, friendly,
-    me, countries, shop, itemStock, forecasts, board, exports,
+    me, countries, shop, itemStock, forecasts, board, exports, announcements,
     watches, addWatch, removeWatch,
     tokensList, tokenCreate, tokenDelete,
     putTrip, clearTrip, heartbeat,
@@ -3823,10 +3865,13 @@ const Plan = (() => {
       const cooldown = await drugCooldown();
 
       const offer = explicit && fresh;
-      const found = await runSearch({
+      const searched = await runSearch({
         items, cfg: config(origin, seenAt, items, cooldown, endTime),
         count: offer ? CHOICES : 0,
       });
+      const found = offer
+        ? searched.map((day) => aimAtRestock(day, items, origin))
+        : aimAtRestock(searched, items, origin);
       const legs = offer ? (found[0] || []) : found;
 
       const partial = shortfall(gathered);
@@ -3881,6 +3926,24 @@ const Plan = (() => {
     }
   }
 
+  function aimAtRestock(legs, items, origin) {
+    if (!Settings.aimAtRestock() || !Array.isArray(legs)) return legs;
+    let ready = origin;
+    return legs.map((leg) => {
+      const after = ready;
+      ready = leg.home_again;
+      const item = items.find((it) => it.country === leg.country && it.item_id === leg.item_id);
+      const win = item && item.forecast && (item.forecast.upcoming || []).find((w) =>
+        Date.parse(w.land_at) <= leg.land && leg.land < Date.parse(w.land_by));
+      const from = win && win.restock_from ? Date.parse(win.restock_from) : NaN;
+      const early = Math.min(leg.land - from, leg.depart - after);
+      if (!(early >= 60_000)) return leg;
+      return Object.assign({}, leg, {
+        depart: leg.depart - early, land: leg.land - early, stock_at: leg.land,
+      });
+    });
+  }
+
   function finish(event, result) {
     running = false;
     stage = null;
@@ -3916,7 +3979,7 @@ const Plan = (() => {
     return { running, stage, lastError };
   }
 
-  return { planDay, replanTail, stop, status, config, offered, choose,
+  return { planDay, replanTail, stop, status, config, offered, choose, aimAtRestock,
            dismiss: () => { choices = null; } };
 })();
 
@@ -4101,9 +4164,7 @@ const Page = (() => {
   }, true);
 
   function darkMode() {
-    if (document.body.classList.contains("dark-mode")) return true;
-    if (document.body.classList.contains("light-mode")) return false;
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    return document.body.classList.contains("dark-mode");
   }
 
   function watch(onChange) {
@@ -4158,16 +4219,72 @@ const Page = (() => {
     const slots = list.querySelectorAll(":scope > li").length;
     const m = /(\d+)/.exec(list.getAttribute("aria-label") || "");
     if (!slots || !m) return null;
-    return { slots, packed: Number(m[1]) };
+    const items = [];
+    for (const b of list.querySelectorAll(":scope > li > button[aria-label]")) {
+      const name = /^(.*) slot \d+$/.exec(b.getAttribute("aria-label"));
+      if (name) items.push(name[1]);
+    }
+    return { slots, packed: Number(m[1]), items };
   }
 
   function inventoryKey(inv) {
-    return inv ? inv.slots + "/" + inv.packed : "";
+    return inv ? inv.slots + "/" + inv.packed + "/" + inv.items.join("|") : "";
+  }
+
+  function shopRows() {
+    const out = [];
+    for (const form of document.querySelectorAll('#travel-root form[id^="item-"][id$="-form"]')) {
+      const id = Number(/^item-(\d+)-form$/.exec(form.id)?.[1]);
+      const row = form.closest("li");
+      if (!id || !row) continue;
+      const nameEl = row.querySelector('button[aria-controls$="-itemInfoWrapper"]');
+      let stock = null;
+      for (const label of row.querySelectorAll("span")) {
+        if (label.textContent.trim() !== "stock" || !label.parentElement) continue;
+        stock = Number(label.parentElement.textContent.replace(/\D/g, ""));
+        break;
+      }
+      const priceEl = row.querySelector('[class*="displayPrice"]');
+      const price = priceEl ? Number(priceEl.textContent.replace(/\D/g, "")) : null;
+      if (stock === null || !isFinite(stock)) continue;
+      out.push({ id, name: nameEl ? nameEl.textContent.trim() : "", stock, price });
+    }
+    return out;
+  }
+
+  function shopWallet() {
+    for (const msg of document.querySelectorAll("#travel-root .msg")) {
+      const text = msg.textContent || "";
+      const money = /have \$([\d,]+)/.exec(text);
+      const used = /purchased (\d+) \/ (\d+)/.exec(text);
+      if (money && used) {
+        return { money: Number(money[1].replace(/,/g, "")),
+                 taken: Number(used[1]), capacity: Number(used[2]) };
+      }
+    }
+    return null;
+  }
+
+  function hospitalLayout() {
+    return document.body.dataset.layout === "hospital";
+  }
+
+  function placeBar(bar) {
+    const root = document.querySelector("#travel-root");
+    if (!root || !root.parentNode) {
+      if (bar.parentNode) bar.parentNode.removeChild(bar);
+      return;
+    }
+    if (bar.nextSibling === root) return;
+    placing = true;
+    try { root.parentNode.insertBefore(bar, root); }
+    finally { placing = false; }
   }
 
   return {
     PANEL_ID, mode, agencyOnPage, hasMap, place, watch, onFormChange,
     selectedTravelType, selectedDestination, travelInventory, darkMode,
+    shopRows, shopWallet, hospitalLayout, placeBar,
     canPreselect, preselect, travelLink, followLink,
   };
 })();
@@ -4639,6 +4756,87 @@ const Style = (() => {
   #oracle-panel .o-spin { animation: o-rot 2s linear infinite !important; }
 }
 
+#oracle-panel button.o-news-pill {
+  appearance: none; border: 0; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px; background: var(--o-accent); color: #fff;
+}
+#oracle-panel button.o-news {
+  display: block; width: 100%; text-align: left; appearance: none; cursor: pointer;
+  padding: 6px 10px; font: inherit; font-size: 12px; font-weight: 600;
+  border: 0; border-bottom: 1px solid var(--o-line);
+  background: var(--o-accent-soft); color: var(--o-accent);
+}
+#oracle-panel [hidden].o-news, #oracle-panel [hidden].o-news-pill { display: none; }
+#oracle-panel .o-notice {
+  margin: 0 0 12px; padding: 14px 16px 12px;
+  background: var(--o-bg-raise); border: 1px solid var(--o-line);
+  border-left: 4px solid var(--o-accent); border-radius: var(--o-radius);
+}
+#oracle-panel .o-notice:last-child { margin-bottom: 0; }
+#oracle-panel .o-notice h4 { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.3; }
+#oracle-panel .o-notice-when {
+  font-size: 11px; color: var(--o-faint); margin: 4px 0 12px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--o-line);
+}
+#oracle-panel .o-notice-body { font-size: 14px; line-height: 1.65; max-width: 68ch; }
+#oracle-panel .o-notice-body p { margin: 0 0 12px; }
+#oracle-panel .o-notice-body > :last-child { margin-bottom: 0; }
+#oracle-panel .o-notice-body strong { color: inherit; font-weight: 700; }
+#oracle-panel .o-notice-body a { color: var(--o-accent); }
+#oracle-panel .o-notice-body ol {
+  margin: 4px 0 14px; padding: 0; list-style: none; counter-reset: o-step;
+}
+#oracle-panel .o-notice-body li {
+  position: relative; margin: 0 0 10px; padding: 10px 12px 10px 44px;
+  background: var(--o-bg-sunk); border-radius: 8px;
+  color: inherit; font: inherit; list-style: none; counter-increment: o-step;
+}
+#oracle-panel .o-notice-body li::before {
+  content: counter(o-step);
+  position: absolute; left: 12px; top: 10px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--o-accent-soft); color: var(--o-accent);
+  font-size: 12px; font-weight: 700; line-height: 22px; text-align: center;
+}
+#oracle-panel .o-new {
+  font-size: 10px; font-weight: 700; padding: 0 6px; border-radius: 999px;
+  background: var(--o-accent); color: #fff; vertical-align: 1px;
+}
+
+#oracle-assist {
+  --oa-bg: #ffffff; --oa-line: #dde3e9; --oa-text: #10161c; --oa-dim: #4a5763;
+  --oa-accent: #0d9488; --oa-go: #047857; --oa-warn: #b45309;
+  position: sticky; top: 0; z-index: 50;
+  box-sizing: border-box; width: 100%; margin: 0 0 8px;
+  padding: 8px 10px; border: 1px solid var(--oa-line); border-radius: 10px;
+  background: var(--oa-bg); color: var(--oa-text);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+#oracle-assist.o-dark {
+  --oa-bg: #171d24; --oa-line: #2c3742; --oa-text: #e7edf3; --oa-dim: #b3c0cd;
+  --oa-accent: #2dd4bf; --oa-go: #34d399; --oa-warn: #fbbf24;
+}
+#oracle-assist[hidden] { display: none; }
+#oracle-assist * { box-sizing: border-box; }
+#oracle-assist .oa-line { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+#oracle-assist .oa-brand { font-weight: 700; font-size: 11px; color: var(--oa-accent); }
+#oracle-assist .oa-note { font-size: 12px; color: var(--oa-dim); }
+#oracle-assist button.oa-go {
+  appearance: none; display: block; width: 100%; min-height: 44px; cursor: pointer;
+  font: inherit; font-size: 15px; font-weight: 700; border-radius: 8px;
+  border: 1px solid var(--oa-accent); background: var(--oa-accent); color: #fff;
+  touch-action: manipulation; user-select: none;
+}
+#oracle-assist button.oa-go:disabled {
+  cursor: default; background: transparent; color: var(--oa-dim); border-color: var(--oa-line);
+}
+#oracle-assist.is-ready button.oa-go { background: var(--oa-go); border-color: var(--oa-go); animation: oa-pulse 1.2s ease-in-out 3; }
+#oracle-assist .oa-msg { font-size: 12px; color: var(--oa-dim); margin-top: 6px; }
+#oracle-assist .oa-msg:empty { display: none; }
+#oracle-assist .oa-msg.is-warn { color: var(--oa-warn); }
+@keyframes oa-pulse { 50% { filter: brightness(1.25); } }
+@media (prefers-reduced-motion: reduce) { #oracle-assist button.oa-go { animation: none !important; } }
+
 #travel-root.tt-clean-flight [class*="viewport___"], #travel-root.tt-travel-table-hide-plane [class*="viewport___"],
 :root:has(#pda-remove-plane) #travel-root [class*="viewport___"] { height: auto; }
 `;
@@ -4742,13 +4940,19 @@ const Fmt = (() => {
     return !!seenAt && Date.now() - seenAt > STALE_SHELF_MS;
   }
 
-  function restock(at, qty, seenAt) {
+  function restock(at, qty, seenAt, until) {
     if (!at) {
       return qty > 0
         ? '<span class="muted">in stock</span>'
         : '<span class="muted" title="No recorded restock yet.">not seen yet</span>';
     }
     const ms = at - Date.now();
+    const range = until && until > at ? esc(clock(at)) + "–" + esc(clock(until)) : esc(clock(at));
+
+    if (ms <= 0 && until && until > Date.now() && !stale(seenAt)) {
+      return `<span class="clock">${range}</span>`
+           + `<span class="o-sub${qty > 0 ? "" : " warn"}">${qty > 0 ? "in stock" : "due now"}</span>`;
+    }
     if (ms <= 0) {
       if (stale(seenAt)) {
         return `<span class="muted" title="Estimated restock passed. Recent shelf data unavailable.">${esc(clock(at))}</span>`
@@ -4761,8 +4965,9 @@ const Fmt = (() => {
           + `<span class="o-sub">${esc(clock(at))}</span>`;
     }
 
-    return `<span class="clock">${esc(clock(at))}</span>`
+    return `<span class="clock">${range}</span>`
          + `<span class="o-sub" data-live="in" data-to="${at}"`
+         + `${until && until > at ? ` data-until="${until}"` : ""}`
          + `${qty > 0 ? ' data-stocked="1"' : ''}`
          + `${seenAt ? ` data-seen="${seenAt}"` : ""}>in ${esc(countdown(ms))}</span>`;
   }
@@ -4778,6 +4983,7 @@ const Fmt = (() => {
       if (!to) continue;
       if (to > now) node.textContent = "in " + countdown(to - now);
       else if (stale(Number(node.dataset.seen))) node.textContent = "was due";
+      else if (Number(node.dataset.until) > now) node.textContent = node.dataset.stocked ? "in stock" : "due now";
       else node.textContent = node.dataset.stocked ? "estimate expired" : "due now";
     }
   }
@@ -4825,6 +5031,7 @@ const Panel = (() => {
         <span class="o-brand"><span class="o-dot"></span>Torn Oracle: Travel</span>
         <span class="o-head-line"></span>
         <span class="o-head-acts">
+          <button type="button" class="o-news-pill" data-act="news" hidden></button>
           <button type="button" class="o-icon" data-act="refresh"
                   title="Refresh data">${ICON_REFRESH}</button>
         </span>
@@ -4834,6 +5041,7 @@ const Panel = (() => {
         <div class="o-update" hidden>Your Torn Oracle script is out of date. <a
           href="https://greasyfork.org/en/scripts/590310-torn-oracle-travel"
           target="_blank" rel="noopener">Update it from Greasyfork</a>.</div>
+        <button type="button" class="o-news" data-act="news" hidden></button>
         <div class="o-tabs" role="tablist"></div>
         <div class="o-panes"></div>
         <div class="o-foot">
@@ -4864,6 +5072,14 @@ const Panel = (() => {
       renderCurrent();
     });
 
+    for (const btn of root.querySelectorAll('[data-act="news"]')) {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (root.classList.contains("o-collapsed")) toggle();
+        show("news");
+      });
+    }
+
     for (const view of views) {
       const tab = document.createElement("button");
       tab.type = "button";
@@ -4883,10 +5099,23 @@ const Panel = (() => {
     }
 
     if (Oracle.updateDue()) showUpdate();
+    paintNews();
     applyCollapsed(Settings.get("collapsed"));
     applyTheme();
     show(Settings.get("tab") || views[0].id);
     return root;
+  }
+
+  function paintNews() {
+    if (!root) return;
+    const unread = News.unread();
+    const pill = root.querySelector(".o-news-pill");
+    const banner = root.querySelector(".o-news");
+    pill.hidden = banner.hidden = unread.length === 0;
+    if (!unread.length) return;
+    pill.textContent = unread.length + " new";
+    banner.textContent = "New: " + unread[0].title
+      + (unread.length > 1 ? " (+" + (unread.length - 1) + " more)" : "");
   }
 
   function showUpdate() {
@@ -5126,7 +5355,7 @@ const Panel = (() => {
   return {
     register, build, show, refresh, badges, paintHead, startClock,
     applyTheme, applyCollapsed, element, paneFor, fetchData, flash,
-    headline, showUpdate,
+    headline, showUpdate, paintNews,
   };
 })();
 
@@ -5554,7 +5783,8 @@ const ViewToday = (() => {
         <td class="num o-col-mid money">${Fmt.esc(Fmt.money(spend))}
           <span class="o-sub">${Fmt.esc(Fmt.price(leg.unit_cost || 0))} each</span></td>
         <td class="num clock o-col-extra">${Fmt.esc(Fmt.clock(landAt))}
-          <span class="o-sub">home ${Fmt.esc(Fmt.clock(homeAt))}</span></td>
+          <span class="o-sub">${leg.stock_at && !rt.landedAt
+            ? "stock by " + Fmt.esc(Fmt.clock(leg.stock_at)) + " · " : ""}home ${Fmt.esc(Fmt.clock(homeAt))}</span></td>
         <td class="num">${outcome}${editable
           ? `<button type="button" class="o-link" data-act="edit-buy" data-leg="${i}">${
               rt.boughtQty === null && !bought ? "record" : "change"}</button>`
@@ -6069,7 +6299,7 @@ const ViewShops = (() => {
                                   : '<span class="muted">0</span>'}
           <span class="o-sub">${Fmt.esc(Fmt.price(item.cost))}</span></td>
         ${data.landAt ? `<td class="num">${yours}</td>` : ""}
-        <td class="num o-col-extra">${Fmt.restock(restock, qty, seen)}</td>
+        <td class="num o-col-extra">${Fmt.restock(restock, qty, seen, restockUntil(item))}</td>
         <td class="num o-col-mid">${m === null ? '<span class="muted">—</span>'
             : `<span class="${m > 0 ? "go" : "muted"} money">${Fmt.esc(Fmt.price(m))}</span>
                <span class="o-sub">${cap ? Fmt.esc(Fmt.money(m * cap) + " total") : "each"}</span>`}</td>
@@ -6106,8 +6336,14 @@ const ViewShops = (() => {
 
   function restockAt(item) {
     const band = data.restocks[String(item.item_id)];
-    const src = (band && band.p50) || item.restock_at;
+    const src = (band && (band.from || band.p50)) || item.restock_at;
     const at = src ? Date.parse(src) : null;
+    return at && !isNaN(at) ? at : null;
+  }
+
+  function restockUntil(item) {
+    const band = data.restocks[String(item.item_id)];
+    const at = band && band.to ? Date.parse(band.to) : null;
     return at && !isNaN(at) ? at : null;
   }
 
@@ -7673,6 +7909,684 @@ const ViewExports = (() => {
   };
 })();
 
+const Assist = (() => {
+  "use strict";
+
+  const BAR_ID = "oracle-assist";
+  const VISIT_KEY = "assist_visit";
+
+  const SETTLE_MS = 1500;
+
+  let bar = null;
+  let busy = false;
+  let settle = null;
+  let message = null;
+  let observed = null;
+  let windows = { code: null, at: 0, bands: {} };
+  let wasReady = false;
+  let alerted = false;
+  let observer = null;
+  let pending = null;
+  const loadedAt = Date.now();
+
+  function rfc() {
+    const m = /(?:^|;\s*)rfc_v=([^;]+)/.exec(document.cookie || "");
+    return m ? m[1] : "";
+  }
+
+  function plain(html) {
+    try {
+      return new DOMParser().parseFromString(String(html), "text/html").body.textContent.trim();
+    } catch (e) {
+      return String(html);
+    }
+  }
+
+  function textOf(data) {
+    if (!data || typeof data !== "object") return "";
+    const raw = data.message || data.text
+      || (data.error && (data.error.message || (typeof data.error === "string" ? data.error : "")))
+      || "";
+    return raw ? plain(raw) : "";
+  }
+
+  async function travelData(step, { method = "GET", query = "", body, form } = {}) {
+    const url = "/page.php?sid=travelData&step=" + step + query + "&rfcv=" + rfc();
+    let payload;
+    if (form) {
+      payload = new FormData();
+      for (const [k, v] of Object.entries(form)) payload.set(k, v);
+    } else if (body !== undefined) {
+      payload = JSON.stringify(body);
+    }
+    try {
+      const res = await fetch(url, {
+        method,
+        credentials: "same-origin",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: payload,
+      });
+      let data = null;
+      try { data = await res.json(); } catch (e) {  }
+      const ok = res.ok && !!data && data.success !== false && !data.error;
+      return { ok, data, message: textOf(data) || (ok ? "" : "Torn did not accept that.") };
+    } catch (err) {
+      return { ok: false, data: null, message: "Could not reach Torn." };
+    }
+  }
+
+  function slotsOf(data) {
+    const slots = (data && (data.slots || (data.inventory && data.inventory.slots))) || [];
+    return Array.isArray(slots) ? slots : [];
+  }
+
+  async function useItem(ref) {
+    const inv = await travelData("inventory");
+    if (!inv.ok && !slotsOf(inv.data).length) return inv;
+    const slot = slotsOf(inv.data).find((s) => s && s.item && Number(s.item.ID) === ref.id);
+    if (!slot) return { ok: false, message: "No " + ref.name + " in your travel inventory." };
+    return travelData("useItem", { method: "POST", body: { slotID: slot.ID } });
+  }
+
+  async function packItem(ref) {
+    const found = await travelData("searchItem", { method: "POST", form: { q: ref.name } });
+    const list = found.data && Array.isArray(found.data.list) ? found.data.list : [];
+    const named = list.filter((e) => e && e.name === ref.name && !e.disabled);
+    const hit = named.find((e) => !e.faction) || named[0];
+    if (!hit) return { ok: false, message: "No " + ref.name + " in your inventory." };
+    const body = { itemID: hit.id };
+    if (hit.armouryID) body.armouryID = hit.armouryID;
+    if (hit.faction) body.factionItem = "1";
+    return travelData("addSlotItem", { method: "POST", body });
+  }
+
+  const ACTIONS = {
+    pack: (d) => packItem(d.ref),
+    use: (d) => useItem(d.ref),
+    buy: (d) => travelData("buy", { query: "&itemID=" + d.ref.id + "&amount=" + d.amount }),
+    fly: () => travelData("travelHome", { method: "POST" }),
+  };
+
+  const WINDOWS_EVERY_MS = 5 * 60_000;
+
+  function countryCode() {
+    const code = Trip.get().country;
+    if (code) return code;
+    const name = String(document.body.dataset.country || "").replace(/-/g, " ").toLowerCase();
+    return Data.CODE_BY_NAME[name] || null;
+  }
+
+  async function loadWindows() {
+    const code = countryCode();
+    if (!code || !Oracle.haveToken()) return;
+    if (windows.code === code && Date.now() - windows.at < WINDOWS_EVERY_MS) return;
+    windows = { code, at: Date.now(), bands: windows.code === code ? windows.bands : {} };
+    try {
+      const batch = await Oracle.forecasts(code, { travel: Settings.get("travel_type") });
+      windows.bands = batch.restocks || {};
+      paint();
+    } catch (err) {
+      Env.log.warn("assist restock windows failed", err.message);
+    }
+  }
+
+  function windowNote(track) {
+    for (const ref of track) {
+      const band = windows.bands[String(ref.id)];
+      const from = band && Date.parse(band.from || band.p50);
+      const to = band && Date.parse(band.to || band.p50);
+      if (!from || isNaN(from)) continue;
+      if (to && Date.now() > to) return ref.name + " restock overdue.";
+      return ref.name + " restock " + Fmt.clock(from) + (to > from ? "–" + Fmt.clock(to) : "") + ".";
+    }
+    return "";
+  }
+
+  function visit() {
+    const v = Env.read(VISIT_KEY, null);
+    return v && typeof v === "object" ? v : {};
+  }
+
+  function markVisit(patch) {
+    Env.write(VISIT_KEY, Object.assign(visit(), patch));
+  }
+
+  function inHospital() {
+    if (observed && observed.at > loadedAt) return observed.state === "Hospital";
+    return Page.hospitalLayout();
+  }
+
+  function tracked() {
+    const picked = Settings.get("assist_track");
+    if (picked.length) return picked;
+    const leg = Trip.get().active ? Trip.currentLeg() : null;
+    return leg && leg.item_id ? [{ id: leg.item_id, name: leg.item_name }] : [];
+  }
+
+  function facts() {
+    const mode = Page.mode();
+    const inv = Page.travelInventory();
+    const v = visit();
+    return {
+      mode,
+      kit: Settings.get("assist_kit"),
+      track: tracked(),
+      carried: inv ? inv.items : null,
+      hospital: inHospital(),
+      inbound: Trip.get().phase === "inbound",
+      rows: mode === "abroad" ? Page.shopRows() : [],
+      wallet: mode === "abroad" ? Page.shopWallet() : null,
+      bought: v.bought === true,
+      hospUsed: v.hospUsed === true,
+    };
+  }
+
+  function decide(f) {
+    const count = (ref) => (ref && f.carried ? f.carried.filter((n) => n === ref.name).length : 0);
+    const kit = f.kit || { hosp: null, med: null, meds: 0 };
+
+    if (f.mode === "agency") {
+      const need = [];
+      if (kit.hosp) need.push({ ref: kit.hosp, n: 1 });
+      if (kit.med && kit.meds > 0) need.push({ ref: kit.med, n: kit.meds });
+      if (!need.length || !f.carried) return null;
+      for (const { ref, n } of need) {
+        const have = count(ref);
+        if (have < n) {
+          return { act: "pack", ref, label: "Pack " + ref.name + " (" + (have + 1) + " of " + n + ")" };
+        }
+      }
+      return { label: "Trip kit packed", note: "Ready to fly." };
+    }
+
+    if (f.mode === "flight") {
+      if (!kit.hosp || f.inbound) return null;
+      if (f.hospUsed) return { label: "Self-hosp used", note: "You land in hospital." };
+      return { act: "use", ref: kit.hosp, label: "Self-hosp now", note: "You land in hospital." };
+    }
+
+    if (f.mode !== "abroad" || !f.wallet) return null;
+
+    const free = Math.max(0, f.wallet.capacity - f.wallet.taken);
+    const meds = kit.med ? count(kit.med) : 0;
+    const hospLeft = kit.hosp ? count(kit.hosp) : 0;
+    const shelves = f.track
+      .map((ref) => ({ ref, row: f.rows.find((r) => r.id === ref.id) }))
+      .filter((x) => x.row);
+    const stock = shelves.reduce((sum, x) => sum + x.row.stock, 0);
+    const names = f.track.map((r) => r.name).join(", ");
+
+    const want = f.hospital ? free + meds : free;
+    const ready = want > 0 && shelves.length > 0 && stock >= want;
+    const watching = names ? "Watching " + names : "Pick items to watch on the Assist tab";
+
+    if (f.hospital) {
+      if (!ready) return { label: watching, note: want + " slots to fill.", ready, watch: true };
+      if (meds > 0) {
+        return { act: "use", ref: kit.med, ready,
+                 label: "Med out (" + meds + " left)", note: "Restocked: " + stock + " in stock." };
+      }
+      return { label: "Restocked", note: "No med-out items left. Buy when your hospital time ends.", ready };
+    }
+
+    if (free === 0) {
+      return f.bought ? { act: "fly", label: "Fly home", ready } : { label: "Your bag is full", ready };
+    }
+
+    for (const x of shelves) {
+      if (x.row.stock <= 0 || !x.row.price) continue;
+      const amount = Math.min(x.row.stock, free, Math.floor(f.wallet.money / x.row.price));
+      if (amount <= 0) continue;
+      if (ready || f.bought || !hospLeft) {
+        return { act: "buy", ref: x.ref, amount, ready,
+                 label: "Buy " + amount + " " + x.ref.name };
+      }
+      break;
+    }
+    if (f.bought) return { act: "fly", label: "Fly home", ready };
+    if (hospLeft) {
+      return { act: "use", ref: kit.hosp, ready,
+               label: "Self-hosp", note: "Waits in hospital, safe from muggers." };
+    }
+    return { label: watching, note: free + " slots to fill.", ready, watch: true };
+  }
+
+  function pageKey() {
+    const inv = Page.travelInventory();
+    const w = Page.shopWallet();
+    return JSON.stringify([inv && inv.items, w, document.body.dataset.layout]);
+  }
+
+  function settling() {
+    if (!settle) return false;
+    if (Date.now() > settle.until || pageKey() !== settle.key) { settle = null; return false; }
+    return true;
+  }
+
+  async function press() {
+    if (busy || settling()) return;
+    const step = decide(facts());
+    if (!step || !step.act) return;
+    busy = true;
+    paint();
+    let res;
+    try { res = await ACTIONS[step.act](step); }
+    finally { busy = false; }
+    if (res.ok) {
+      if (step.act === "buy") markVisit({ bought: true });
+      if (step.act === "use" && Page.mode() === "flight") markVisit({ hospUsed: true });
+      settle = { until: Date.now() + SETTLE_MS, key: pageKey() };
+      setTimeout(paint, SETTLE_MS + 50);
+      try { window.dispatchEvent(new Event("focus")); } catch (e) {  }
+      if (step.act === "use") Tracker.poke();
+    }
+    message = res.message ? { text: res.message, tone: res.ok ? "" : "warn" } : null;
+    Env.log.event("assist " + step.act + (res.ok ? " ok" : " refused") + ": " + (res.message || ""));
+    paint();
+  }
+
+  function beep() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      [0, 0.25].forEach((at) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 880;
+        gain.gain.value = 0.15;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + at);
+        osc.stop(ctx.currentTime + at + 0.15);
+      });
+      setTimeout(() => ctx.close(), 1000);
+    } catch (e) {  }
+  }
+
+  function noticeReady(step) {
+    const ready = !!(step && step.ready);
+    if (ready && !wasReady && !alerted) {
+      alerted = true;
+      if (Settings.get("alerts_on")) {
+        Env.toast("Restocked", step.label + ". " + (step.note || ""));
+        beep();
+      }
+      Env.log.event("assist: restock seen");
+    }
+    if (!ready) alerted = false;
+    wasReady = ready;
+  }
+
+  function focused() {
+    try { return Env.visible() && document.hasFocus(); } catch (e) { return Env.visible(); }
+  }
+
+  function build() {
+    bar = document.createElement("div");
+    bar.id = BAR_ID;
+    bar.innerHTML = `
+      <div class="oa-line"><span class="oa-brand">Torn Oracle</span><span class="oa-note"></span></div>
+      <button type="button" class="oa-go"></button>
+      <div class="oa-msg" role="status"></div>`;
+    bar.querySelector(".oa-go").addEventListener("click", (ev) => {
+      if (!ev.isTrusted) return;
+      press();
+    });
+    return bar;
+  }
+
+  function paint() {
+    if (!bar) return;
+    const mode = Page.mode();
+
+    const v = visit();
+    if (mode === "agency" && Object.keys(v).length) Env.write(VISIT_KEY, {});
+    if (mode === "flight" && v.bought) markVisit({ bought: false });
+    if (mode === "abroad" && v.hospUsed) markVisit({ hospUsed: false });
+    if (mode === "abroad" && !focused()) {
+      if (!drawn) bar.hidden = true;
+      return;
+    }
+    const f = facts();
+    const step = decide(f);
+    if (mode === "abroad") {
+      noticeReady(step);
+      loadWindows();
+      if (step && step.watch) {
+        const note = windowNote(f.track);
+        if (note) step.note = note + " " + step.note;
+      }
+    }
+    draw(step);
+  }
+
+  let drawn = "";
+  function draw(step) {
+    const view = step ? {
+      dark: Page.darkMode(),
+      ready: !!step.ready && !!step.act,
+      label: busy ? "Working…" : step.label,
+      disabled: busy || !step.act || settling(),
+      note: step.note || "",
+      msg: message ? message.text : "",
+      tone: message && message.tone ? " is-" + message.tone : "",
+    } : null;
+    const key = JSON.stringify(view);
+    if (key === drawn) return;
+    drawn = key;
+    if (!view) { bar.hidden = true; return; }
+    bar.hidden = false;
+    bar.classList.toggle("o-dark", view.dark);
+    bar.classList.toggle("is-ready", view.ready);
+    const btn = bar.querySelector(".oa-go");
+    btn.textContent = view.label;
+    btn.disabled = view.disabled;
+    bar.querySelector(".oa-note").textContent = view.note;
+    const msg = bar.querySelector(".oa-msg");
+    msg.textContent = view.msg;
+    msg.className = "oa-msg" + view.tone;
+  }
+
+  function schedule() {
+    if (pending) return;
+    pending = setTimeout(() => { pending = null; paint(); }, 250);
+  }
+
+  function watchShop() {
+    if (observer) return;
+    const root = document.querySelector("#travel-root");
+    if (!root) return;
+    observer = new MutationObserver(() => { if (focused()) schedule(); });
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+  }
+
+  function mount() {
+    const first = !bar;
+    if (first) build();
+    if (Page.mode() === "other") {
+      if (bar.parentNode) bar.parentNode.removeChild(bar);
+      return;
+    }
+    Page.placeBar(bar);
+    watchShop();
+    if (first || !drawn) paint();
+  }
+
+  function onObservation(obs) {
+    if (!obs || !obs.state) return;
+    observed = { at: obs.at || Date.now(), state: obs.state };
+    paint();
+  }
+
+  window.addEventListener("focus", () => schedule());
+  document.addEventListener("visibilitychange", () => schedule());
+
+  function kitPacked(items) {
+    const kit = Settings.get("assist_kit");
+    const names = [kit.hosp, kit.med].filter(Boolean).map((r) => r.name);
+    return (items || []).filter((n) => names.includes(n)).length;
+  }
+
+  return { mount, paint, decide, onObservation, kitPacked, tracked };
+})();
+
+const ViewAssist = (() => {
+  "use strict";
+
+  let catalogue = null;
+  let loading = false;
+  let error = null;
+
+  const tell = (text, tone) => Panel.flash(text, tone, "assist");
+
+  async function loadCatalogue() {
+    if (loading || catalogue || !Torn.haveKey()) return;
+    loading = true;
+    error = null;
+    try {
+      const payload = await Torn.items();
+      const list = Array.isArray(payload.items) ? payload.items : Object.values(payload.items || {});
+      catalogue = list.map((it) => ({
+        id: Number(it.id),
+        name: it.name,
+        abroad: ((it.value && it.value.shops) || []).some((sh) => sh.country && sh.country !== "Torn"),
+      })).filter((it) => it.id > 0 && it.name)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    } catch (err) {
+      error = err.message || String(err);
+    } finally {
+      loading = false;
+      Panel.refresh("assist");
+    }
+  }
+
+  function find(name, abroadOnly) {
+    const low = name.trim().toLowerCase();
+    return (catalogue || []).find((it) => it.name.toLowerCase() === low
+                                          && (!abroadOnly || it.abroad)) || null;
+  }
+
+  function options(id, abroadOnly) {
+    const items = (catalogue || []).filter((it) => !abroadOnly || it.abroad);
+    return `<datalist id="${id}">${items.map((it) =>
+      `<option value="${Fmt.esc(it.name)}"></option>`).join("")}</datalist>`;
+  }
+
+  function itemInput(slot, ref, list) {
+    return `<input type="text" data-kit="${slot}" list="${list}" autocomplete="off"
+      placeholder="Item name" value="${ref ? Fmt.esc(ref.name) : ""}">`;
+  }
+
+  function render(el) {
+    if (!Torn.haveKey()) {
+      el.innerHTML = `<div class="o-empty"><p>Add your Torn API key in Settings to pick items.</p></div>`;
+      return;
+    }
+    if (!catalogue && !error) loadCatalogue();
+    const kit = Settings.get("assist_kit");
+    const picked = Settings.get("assist_track");
+    const track = Assist.tracked();
+    const items = error
+      ? `<p class="o-note is-warn">${Fmt.esc(error)}
+           <button type="button" class="o-link" data-act="retry">Try again</button></p>`
+      : !catalogue ? '<p class="o-note">Loading items…</p>' : "";
+
+    el.innerHTML = `
+      <p class="o-note" style="margin:0 0 12px">This tab makes flying as safe and quick as possible.
+        Once you set it up, a button appears at the top of the travel page. Click it to self-hosp
+        when you land, watch the shop for a restock, buy your items and fly home, all from one button.</p>
+      ${items}
+      <div class="o-group"><h4>Trip kit</h4>
+        <div class="o-field"><span class="o-field-label">Self-hosp item</span>
+          ${itemInput("hosp", kit.hosp, "oracle-all-items")}</div>
+        <div class="o-field"><span class="o-field-label">Med-out item</span>
+          ${itemInput("med", kit.med, "oracle-all-items")}</div>
+        <div class="o-field"><span class="o-field-label">Med-out items to pack</span>
+          <input type="number" data-kit="meds" min="0" max="${Settings.MAX_MEDS}" step="1"
+                 value="${kit.meds}"></div>
+      </div>
+      <div class="o-group"><h4>Tracked items</h4>
+        ${track.length ? `<div class="o-chips">${track.map((ref, i) => `
+          <span class="o-chip is-on">${i + 1}. ${Fmt.esc(ref.name)}${picked.length ? `
+            ${i > 0 ? `<button type="button" class="o-link" data-up="${ref.id}" aria-label="Move up">↑</button>` : ""}
+            <button type="button" class="o-link" data-drop="${ref.id}" aria-label="Remove">×</button>` : ""}
+          </span>`).join("")}</div>` : ""}
+        <p class="o-note">${picked.length
+          ? "The first item in stock is bought first."
+          : track.length ? "This is your plan's item. Add items to track others."
+                         : "Add the items you fly for."}</p>
+        ${picked.length < Settings.MAX_TRACKED ? `<div class="o-keyform">
+          <input type="text" data-track list="oracle-abroad-items" autocomplete="off"
+                 placeholder="Add an item sold abroad">
+          <button type="button" class="o-btn" data-act="track">Add</button></div>` : ""}
+      </div>
+      ${catalogue ? options("oracle-all-items", false) + options("oracle-abroad-items", true) : ""}`;
+    wire(el);
+  }
+
+  function setKit(patch) {
+    const next = Object.assign({}, Settings.get("assist_kit"), patch);
+    if (next.hosp && next.med && next.hosp.id === next.med.id) {
+      tell("Pick a different item for self-hosp and med-out.", "warn");
+      Panel.refresh("assist", true);
+      return;
+    }
+    Settings.set("assist_kit", next);
+    Assist.paint();
+    Panel.refresh("assist", true);
+  }
+
+  function addTracked(el) {
+    const input = el.querySelector("[data-track]");
+    const name = input ? input.value : "";
+    if (!name.trim()) return;
+    const hit = find(name, true);
+    if (!hit) { tell("No item sold abroad is named " + name.trim() + ".", "warn"); return; }
+    Settings.set("assist_track", [...Settings.get("assist_track"), { id: hit.id, name: hit.name }]);
+    Assist.paint();
+    Panel.refresh("assist", true);
+  }
+
+  function wire(el) {
+    for (const input of el.querySelectorAll('input[data-kit="hosp"], input[data-kit="med"]')) {
+      input.addEventListener("change", () => {
+        const slot = input.dataset.kit;
+        if (!input.value.trim()) { setKit({ [slot]: null }); return; }
+        const hit = find(input.value, false);
+        if (!hit) { tell("No item is named " + input.value.trim() + ".", "warn"); return; }
+        setKit({ [slot]: { id: hit.id, name: hit.name } });
+      });
+    }
+    const meds = el.querySelector('input[data-kit="meds"]');
+    if (meds) meds.addEventListener("change", () => setKit({ meds: Number(meds.value) || 0 }));
+    const track = el.querySelector("[data-track]");
+    if (track) {
+      track.addEventListener("keydown", (ev) => { if (ev.key === "Enter") addTracked(el); });
+    }
+    for (const btn of el.querySelectorAll("[data-act]")) {
+      btn.addEventListener("click", () => {
+        if (btn.dataset.act === "track") addTracked(el);
+        if (btn.dataset.act === "retry") { error = null; loadCatalogue(); }
+      });
+    }
+    for (const btn of el.querySelectorAll("[data-drop]")) {
+      btn.addEventListener("click", () => {
+        const id = Number(btn.dataset.drop);
+        Settings.set("assist_track", Settings.get("assist_track").filter((r) => r.id !== id));
+        Assist.paint();
+        Panel.refresh("assist", true);
+      });
+    }
+    for (const btn of el.querySelectorAll("[data-up]")) {
+      btn.addEventListener("click", () => {
+        const list = Settings.get("assist_track").slice();
+        const i = list.findIndex((r) => r.id === Number(btn.dataset.up));
+        if (i > 0) [list[i - 1], list[i]] = [list[i], list[i - 1]];
+        Settings.set("assist_track", list);
+        Assist.paint();
+        Panel.refresh("assist", true);
+      });
+    }
+  }
+
+  return { id: "assist", label: "Assist", render };
+})();
+
+const News = (() => {
+  "use strict";
+
+  const LIST_KEY = "news";
+  const SEEN_KEY = "news_seen";
+  const EVERY_MS = 15 * 60_000;
+
+  let lastFetch = 0;
+
+  function list() {
+    const v = Env.read(LIST_KEY, []);
+    return Array.isArray(v) ? v : [];
+  }
+
+  function seen() {
+    const v = Env.read(SEEN_KEY, []);
+    return Array.isArray(v) ? v : [];
+  }
+
+  function unread() {
+    const ids = seen();
+    return list().filter((n) => !ids.includes(n.id));
+  }
+
+  function markRead() {
+    const ids = list().map((n) => n.id);
+    if (ids.every((id) => seen().includes(id))) return;
+    Env.write(SEEN_KEY, ids);
+    Bus.emit("news");
+  }
+
+  async function fetchNow() {
+    lastFetch = Date.now();
+    try {
+      const notices = await Oracle.announcements();
+      if (!Array.isArray(notices)) return;
+      const before = JSON.stringify(list());
+      Env.write(LIST_KEY, notices);
+      if (JSON.stringify(notices) !== before) Bus.emit("news");
+    } catch (err) {
+      Env.log.warn("announcements read failed", err.message);
+    }
+  }
+
+  function start() {
+    fetchNow();
+    setInterval(() => {
+      if (Env.visible() && Date.now() - lastFetch >= EVERY_MS) fetchNow();
+    }, 60_000);
+  }
+
+  return { list, unread, markRead, start };
+})();
+
+const ViewNews = (() => {
+  "use strict";
+
+  const freshNow = new Set();
+
+  function inline(text) {
+    return Fmt.esc(text)
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/https?:\/\/[^\s<"']+/g,
+        (url) => `<a href="${url}" target="_blank" rel="noopener">${url}</a>`)
+      .replace(/\n/g, "<br>");
+  }
+
+  function body(text) {
+    let html = "", steps = "";
+    for (const para of String(text).split(/\n{2,}/)) {
+      const step = /^\s*\d+[.)]\s+([\s\S]*)$/.exec(para);
+      if (step) { steps += `<li>${inline(step[1])}</li>`; continue; }
+      if (steps) { html += `<ol>${steps}</ol>`; steps = ""; }
+      html += `<p>${inline(para)}</p>`;
+    }
+    return html + (steps ? `<ol>${steps}</ol>` : "");
+  }
+
+  function render(el) {
+    for (const n of News.unread()) freshNow.add(n.id);
+    const notices = News.list();
+    el.innerHTML = notices.length ? notices.map((n) => `
+      <article class="o-notice">
+        <h4>${Fmt.esc(n.title)}${freshNow.has(n.id) ? ' <span class="o-new">New</span>' : ""}</h4>
+        <div class="o-notice-when">${Fmt.esc(new Date(n.created_at).toLocaleDateString())}</div>
+        <div class="o-notice-body">${body(n.body)}</div>
+      </article>`).join("")
+      : '<div class="o-empty"><p>No announcements.</p></div>';
+    News.markRead();
+  }
+
+  return { id: "news", label: "News", render, badge: () => News.unread().length };
+})();
+
 Env.ready().then(function boot() {
   "use strict";
 
@@ -7687,12 +8601,15 @@ Env.ready().then(function boot() {
   Panel.register(ViewItems);
   Panel.register(ViewWatches);
   Panel.register(ViewMuseum);
+  Panel.register(ViewAssist);
+  Panel.register(ViewNews);
   Panel.register(ViewSettings);
 
   const panel = Panel.build();
   let mode = Page.mode();
 
   function placePanel() {
+    Assist.mount();
     if (mode === "other") {
       if (panel.parentNode) panel.parentNode.removeChild(panel);
       return;
@@ -7716,6 +8633,9 @@ Env.ready().then(function boot() {
   Page.watch((next) => { applyMode(next); placePanel(); readForm(); });
   Page.followLink();
 
+  new MutationObserver(() => { Panel.applyTheme(); Assist.paint(); })
+    .observe(document.body, { attributes: true, attributeFilter: ["class"] });
+
   window.addEventListener("hashchange", Page.followLink);
 
   readForm = Page.onFormChange((name, value) => {
@@ -7726,7 +8646,7 @@ Env.ready().then(function boot() {
     }
     if (name === "inventory") {
 
-      const free = Math.max(1, value.slots - value.packed);
+      const free = Math.max(1, value.slots - value.packed + Assist.kitPacked(value.items));
       if (Settings.get("capacity") !== free) { Settings.set("capacity", free); Panel.refresh(); }
     }
     if (name === "destination") {
@@ -7739,6 +8659,7 @@ Env.ready().then(function boot() {
   Tracker.onEvents((result) => {
 
     try { Alerts.onTracked(result); } catch (e) { Env.log.error("alerts failed", e); }
+    Assist.onObservation(result.observation);
 
     Escort.sync();
     PlanSync.changed();
@@ -7776,6 +8697,7 @@ Env.ready().then(function boot() {
   Bus.on("escort", () => Panel.refresh("settings"));
   Bus.on("sync", () => Panel.refresh("settings"));
   Bus.on("oracle:update", () => Panel.showUpdate());
+  Bus.on("news", () => { Panel.paintNews(); Panel.refresh("news"); });
 
   Bus.on("alert", () => { Panel.paintHead(); Panel.refresh("today"); });
 
@@ -7818,6 +8740,7 @@ Env.ready().then(function boot() {
   setInterval(() => { if (Env.visible()) PlanSync.pull(); }, 120_000);
 
   Tracker.start();
+  News.start();
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
