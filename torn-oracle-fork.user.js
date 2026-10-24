@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.1-fork
+// @version      2.6.3-fork
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.1 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
+// @description  Fork de Torn Oracle: Travel 2.6.3 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -371,11 +371,11 @@ const Settings = (() => {
       unit: "h", sync: "end_hours",
       label: "Plan ahead",
       help: "How far ahead a plan reaches, up to 16 hours." },
-    { name: "landing_aim", group: "trips", kind: "choice", def: "auto",
+    { name: "landing_aim", group: "trips", kind: "choice", def: "auto", sync: "landing_aim",
       choices: () => [["auto", "Automatic"], ["restock", "Start of the restock window"],
                       ["stock", "When stock is likely there"]],
       label: "Landing time",
-      help: "The restock window start lands you early to wait in hospital. Automatic picks it when the Assist tab has a self-hosp item." },
+      help: "Start of the restock window lands you at the earliest restock minute you can reach, to wait in hospital. Automatic picks it when the Assist tab has a self-hosp item." },
     { name: "drug_priority", group: "trips", kind: "bool", def: false, sync: "drug_priority",
       label: "Plan around drug cooldown",
       help: "Times a departure for when your drug cooldown ends." },
@@ -435,7 +435,7 @@ const Settings = (() => {
       label: "Show my plan on Discord",
       help: "Posts your plan to your Discord thread or DMs and updates it when you re-plan." },
 
-    { name: "assist_kit", group: "assist", kind: "kit", hidden: true,
+    { name: "assist_kit", group: "assist", kind: "kit", hidden: true, sync: "self_hosp",
       def: { hosp: null, med: null, meds: 0 },
       label: "Trip kit" },
     { name: "assist_track", group: "assist", kind: "itemrefs", def: [], hidden: true,
@@ -682,7 +682,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.1";
+  const SCRIPT_VERSION = "2.6.3";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -828,6 +828,7 @@ const Oracle = (() => {
   const dials = (q) => {
     q.set("floor", String(Settings.get("landing_floor") / 100));
     q.set("target", String(Settings.get("landing_target") / 100));
+    q.set("aim", Settings.aimAtRestock() ? "1" : "0");
     return q;
   };
 
@@ -1083,6 +1084,7 @@ const SettingsSync = (() => {
   const rows = () => Settings.SCHEMA.filter((r) => r.sync);
 
   function toWire(row, v) {
+    if (row.kind === "kit") return !!(v && v.hosp);
     if (row.pct) return v / 100;
     if (row.kind === "types") {
 
@@ -1093,7 +1095,7 @@ const SettingsSync = (() => {
   }
 
   function fromWire(row, v) {
-    if (v === null || v === undefined) return undefined;
+    if (v === null || v === undefined || row.kind === "kit") return undefined;
     if (row.pct) return Math.round(v * 100);
     if (row.kind === "types") {
       return [...new Set(v.map(Data.itemType).filter(Boolean))];
@@ -3865,13 +3867,10 @@ const Plan = (() => {
       const cooldown = await drugCooldown();
 
       const offer = explicit && fresh;
-      const searched = await runSearch({
+      const found = await runSearch({
         items, cfg: config(origin, seenAt, items, cooldown, endTime),
         count: offer ? CHOICES : 0,
       });
-      const found = offer
-        ? searched.map((day) => aimAtRestock(day, items, origin))
-        : aimAtRestock(searched, items, origin);
       const legs = offer ? (found[0] || []) : found;
 
       const partial = shortfall(gathered);
@@ -3926,24 +3925,6 @@ const Plan = (() => {
     }
   }
 
-  function aimAtRestock(legs, items, origin) {
-    if (!Settings.aimAtRestock() || !Array.isArray(legs)) return legs;
-    let ready = origin;
-    return legs.map((leg) => {
-      const after = ready;
-      ready = leg.home_again;
-      const item = items.find((it) => it.country === leg.country && it.item_id === leg.item_id);
-      const win = item && item.forecast && (item.forecast.upcoming || []).find((w) =>
-        Date.parse(w.land_at) <= leg.land && leg.land < Date.parse(w.land_by));
-      const from = win && win.restock_from ? Date.parse(win.restock_from) : NaN;
-      const early = Math.min(leg.land - from, leg.depart - after);
-      if (!(early >= 60_000)) return leg;
-      return Object.assign({}, leg, {
-        depart: leg.depart - early, land: leg.land - early, stock_at: leg.land,
-      });
-    });
-  }
-
   function finish(event, result) {
     running = false;
     stage = null;
@@ -3979,7 +3960,7 @@ const Plan = (() => {
     return { running, stage, lastError };
   }
 
-  return { planDay, replanTail, stop, status, config, offered, choose, aimAtRestock,
+  return { planDay, replanTail, stop, status, config, offered, choose,
            dismiss: () => { choices = null; } };
 })();
 
@@ -5783,8 +5764,7 @@ const ViewToday = (() => {
         <td class="num o-col-mid money">${Fmt.esc(Fmt.money(spend))}
           <span class="o-sub">${Fmt.esc(Fmt.price(leg.unit_cost || 0))} each</span></td>
         <td class="num clock o-col-extra">${Fmt.esc(Fmt.clock(landAt))}
-          <span class="o-sub">${leg.stock_at && !rt.landedAt
-            ? "stock by " + Fmt.esc(Fmt.clock(leg.stock_at)) + " · " : ""}home ${Fmt.esc(Fmt.clock(homeAt))}</span></td>
+          <span class="o-sub">home ${Fmt.esc(Fmt.clock(homeAt))}</span></td>
         <td class="num">${outcome}${editable
           ? `<button type="button" class="o-link" data-act="edit-buy" data-leg="${i}">${
               rt.boughtQty === null && !bought ? "record" : "change"}</button>`
@@ -6116,7 +6096,8 @@ const ViewShops = (() => {
     const code = currentCountry();
     if (loading) { pendingReload = true; return; }
     const landAt = landingFor(code);
-    if (!force && data && data.code === code && data.landAt === landAt
+    const aim = Settings.aimAtRestock();
+    if (!force && data && data.code === code && data.landAt === landAt && data.aim === aim
         && Date.now() - data.at < 45_000) return;
     loading = true;
     error = null;
@@ -6141,7 +6122,7 @@ const ViewShops = (() => {
         forecastError = err.message;
         Env.log.warn("forecasts failed", err.code || "");
       }
-      data = { code, shop, forecasts, reasons, restocks, horizonHours, atLanding, landAt,
+      data = { code, shop, forecasts, reasons, restocks, horizonHours, atLanding, landAt, aim,
                at: Date.now() };
     } catch (err) {
       error = err.message;
@@ -6754,7 +6735,10 @@ const ViewWatches = (() => {
 
   function existing() {
     const body = ordered(rows.list).map((w) => {
-      const due = w.predicted_restock_at ? Date.parse(w.predicted_restock_at) : null;
+
+      const band = w.restock || {};
+      const due = Date.parse(band.from || band.p50 || w.predicted_restock_at) || null;
+      const until = Date.parse(band.to) || null;
 
       const seen = w.observed_at ? Date.parse(w.observed_at) : null;
       const f = w.forecast;
@@ -6791,7 +6775,7 @@ const ViewWatches = (() => {
             ? `<span class="go">${Fmt.esc(Fmt.count(w.quantity))}</span>`
             : '<span class="muted">0</span>'}
           <span class="o-sub">${Fmt.esc(Fmt.price(w.cost))}</span></td>
-        <td class="num">${Fmt.restock(due, w.quantity || 0, seen)}</td>
+        <td class="num">${Fmt.restock(due, w.quantity || 0, seen, until)}</td>
         <td class="num o-col-extra">${ppm === null ? '<span class="muted">—</span>'
             : `<span class="${ppm > 0 ? "go" : "muted"} money">${Fmt.esc(Fmt.price(ppm))}</span>`}</td>
         <td class="num"${boardTitle}>${board}</td>
@@ -8562,9 +8546,16 @@ const ViewNews = (() => {
 
   function body(text) {
     let html = "", steps = "";
+    const STEP = /^\s*\d+[.)]\s+([\s\S]*)$/;
     for (const para of String(text).split(/\n{2,}/)) {
-      const step = /^\s*\d+[.)]\s+([\s\S]*)$/.exec(para);
-      if (step) { steps += `<li>${inline(step[1])}</li>`; continue; }
+
+      const lines = para.split("\n");
+      const parts = lines.length > 1 && lines.every((l) => STEP.test(l)) ? lines : [para];
+      const step = STEP.exec(parts[0]);
+      if (step) {
+        for (const part of parts) steps += `<li>${inline(STEP.exec(part)[1])}</li>`;
+        continue;
+      }
       if (steps) { html += `<ol>${steps}</ol>`; steps = ""; }
       html += `<p>${inline(para)}</p>`;
     }
