@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.3-fork
+// @version      2.6.4-fork
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.3 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
+// @description  Fork de Torn Oracle: Travel 2.6.4 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -244,22 +244,22 @@ const Data = (() => {
   };
 
   const COUNTRY_ROWS = [
-    ["mex", "Mexico", "🇲🇽", [24, 17, 12, 7]],
-    ["cay", "Cayman Islands", "🇰🇾", [33, 23, 17, 10]],
-    ["can", "Canada", "🇨🇦", [39, 27, 19, 12]],
-    ["haw", "Hawaii", "🇺🇸", [127, 89, 63, 38]],
-    ["uni", "United Kingdom", "🇬🇧", [151, 106, 75, 45]],
-    ["arg", "Argentina", "🇦🇷", [158, 111, 79, 47]],
-    ["swi", "Switzerland", "🇨🇭", [166, 116, 83, 50]],
-    ["jap", "Japan", "🇯🇵", [213, 149, 107, 64]],
-    ["chi", "China", "🇨🇳", [229, 160, 114, 69]],
-    ["uae", "UAE", "🇦🇪", [257, 180, 128, 77]],
-    ["sou", "South Africa", "🇿🇦", [282, 197, 141, 85]],
+    ["mex", "Mexico", [24, 17, 12, 7]],
+    ["cay", "Cayman Islands", [33, 23, 17, 10]],
+    ["can", "Canada", [39, 27, 19, 12]],
+    ["haw", "Hawaii", [127, 89, 63, 38]],
+    ["uni", "United Kingdom", [151, 106, 75, 45]],
+    ["arg", "Argentina", [158, 111, 79, 47]],
+    ["swi", "Switzerland", [166, 116, 83, 50]],
+    ["jap", "Japan", [213, 149, 107, 64]],
+    ["chi", "China", [229, 160, 114, 69]],
+    ["uae", "UAE", [257, 180, 128, 77]],
+    ["sou", "South Africa", [282, 197, 141, 85]],
   ];
 
   const COUNTRIES = {};
-  for (const [code, name, flag, minutes] of COUNTRY_ROWS) {
-    COUNTRIES[code] = { code, name, flag, minutes };
+  for (const [code, name, minutes] of COUNTRY_ROWS) {
+    COUNTRIES[code] = { code, name, minutes };
   }
 
   const CODE_BY_NAME = {};
@@ -304,19 +304,9 @@ const Data = (() => {
     return (perItem * capacity) / (oneWay * 2);
   }
 
-  function label(code) {
-    const c = COUNTRIES[code];
-    return c ? c.flag + " " + c.name : String(code || "").toUpperCase();
-  }
-
   function name(code) {
     const c = COUNTRIES[code];
     return c ? c.name : String(code || "").toUpperCase();
-  }
-
-  function flag(code) {
-    const c = COUNTRIES[code];
-    return c ? c.flag : "";
   }
 
   const ITEM_TYPES = [
@@ -338,7 +328,7 @@ const Data = (() => {
     DEFAULT_ITEM_TYPES, TRAVEL_BY_INDEX,
     codes: () => Object.keys(COUNTRIES),
     list: () => Object.values(COUNTRIES),
-    flightMinutes, profitPerMinute, unitSell, margin, channel, label, name, flag, itemType,
+    flightMinutes, profitPerMinute, unitSell, margin, channel, name, itemType,
   };
 })();
 
@@ -435,11 +425,11 @@ const Settings = (() => {
       label: "Show my plan on Discord",
       help: "Posts your plan to your Discord thread or DMs and updates it when you re-plan." },
 
-    { name: "assist_kit", group: "assist", kind: "kit", hidden: true, sync: "self_hosp",
-      def: { hosp: null, med: null, meds: 0 },
+    { name: "assist_kit", group: "assist", kind: "kit", hidden: true, sync: "assist_kit",
+      def: { hosp: null, med: null, meds: 0, extras: [] },
       label: "Trip kit" },
     { name: "assist_track", group: "assist", kind: "itemrefs", def: [], hidden: true,
-      label: "Tracked items" },
+      sync: "assist_track", label: "Tracked items" },
 
     { name: "collapsed", group: "display", kind: "bool", def: false, hidden: true,
       label: "Panel collapsed" },
@@ -459,6 +449,8 @@ const Settings = (() => {
 
   const MAX_MEDS = 20;
   const MAX_TRACKED = 10;
+  const MAX_EXTRAS = 10;
+  const MAX_EXTRA_COUNT = 50;
 
   const BY_NAME = {};
   for (const row of SCHEMA) BY_NAME[row.name] = row;
@@ -545,8 +537,16 @@ const Settings = (() => {
       case "kit": {
         if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
         const meds = Math.round(Number(raw.meds));
+        const extras = [];
+        for (const e of Array.isArray(raw.extras) ? raw.extras : []) {
+          const ref = itemRef(e);
+          const n = Math.round(Number(e && e.n));
+          if (!ref || !(n >= 1) || extras.some((x) => x.id === ref.id)) continue;
+          extras.push(Object.assign(ref, { n: Math.min(n, MAX_EXTRA_COUNT) }));
+        }
         return { hosp: itemRef(raw.hosp), med: itemRef(raw.med),
-                 meds: isFinite(meds) ? Math.min(Math.max(meds, 0), MAX_MEDS) : 0 };
+                 meds: isFinite(meds) ? Math.min(Math.max(meds, 0), MAX_MEDS) : 0,
+                 extras: extras.slice(0, MAX_EXTRAS) };
       }
       case "itemrefs": {
         if (!Array.isArray(raw)) return undefined;
@@ -669,7 +669,7 @@ const Settings = (() => {
   }
 
   return {
-    SCHEMA, BY_NAME, VERSION, MAX_MEDS, MAX_TRACKED,
+    SCHEMA, BY_NAME, VERSION, MAX_MEDS, MAX_TRACKED, MAX_EXTRAS, MAX_EXTRA_COUNT,
     load, all, get, set, apply, sync, onChange, exportSafe, exportShared, importShared,
     planCountries, aimAtRestock,
     groups: () => ["account", "trips", "buying", "forecast", "alerts", "display"],
@@ -682,7 +682,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.3";
+  const SCRIPT_VERSION = "2.6.4";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -705,6 +705,7 @@ const Oracle = (() => {
     signup_closed: "Torn Oracle is not taking new accounts from the panel yet. "
                  + "Use /token new on Discord.",
     bad_key: "Torn did not accept that key.",
+    bad_land_at: "Your flight has landed. Stock at landing is not shown.",
     too_many_watches: "That is as many watches as Torn Oracle allows. Remove one first.",
     too_many_tokens: "That is as many tokens as Torn Oracle allows. Delete an old one first.",
     no_account: "That Torn Oracle account no longer exists.",
@@ -1084,7 +1085,6 @@ const SettingsSync = (() => {
   const rows = () => Settings.SCHEMA.filter((r) => r.sync);
 
   function toWire(row, v) {
-    if (row.kind === "kit") return !!(v && v.hosp);
     if (row.pct) return v / 100;
     if (row.kind === "types") {
 
@@ -1095,7 +1095,7 @@ const SettingsSync = (() => {
   }
 
   function fromWire(row, v) {
-    if (v === null || v === undefined || row.kind === "kit") return undefined;
+    if (v === null || v === undefined) return undefined;
     if (row.pct) return Math.round(v * 100);
     if (row.kind === "types") {
       return [...new Set(v.map(Data.itemType).filter(Boolean))];
@@ -1145,6 +1145,12 @@ const SettingsSync = (() => {
       const changes = {};
       for (const row of rows()) {
         if (pending.has(row.name)) continue;
+
+        if (row.group === "assist" && remote[row.sync] === null
+            && JSON.stringify(Settings.get(row.name)) !== JSON.stringify(row.def)) {
+          pending.add(row.name);
+          continue;
+        }
         const v = fromWire(row, remote[row.sync]);
         if (v !== undefined) changes[row.name] = v;
       }
@@ -1883,6 +1889,17 @@ const Trip = (() => {
     return { by, soft: by >= LATE_SOFT_MS, hard: by >= LATE_HARD_MS };
   }
 
+  function hospitalAbroad(state, now) {
+    const s = get();
+    return state === "Hospital" && (s.phase === "abroad"
+      || (s.phase === "outbound" && !!s.arrivalAt && now >= s.arrivalAt));
+  }
+
+  function phaseOf(state, description, now) {
+    return hospitalAbroad(state, now || Date.now()) ? "abroad"
+      : Phase.travelPhase(state, description, get().phase);
+  }
+
   function apply(obs) {
 
     sync();
@@ -1896,7 +1913,8 @@ const Trip = (() => {
 
     s.racing = !!obs.racing;
 
-    const nextPhase = Phase.travelPhase(obs.state, obs.description, prevPhase);
+    const hospAbroad = hospitalAbroad(obs.state, now);
+    const nextPhase = phaseOf(obs.state, obs.description, now);
 
     if (nextPhase === null) {
       s.observedAt = now;
@@ -1905,7 +1923,7 @@ const Trip = (() => {
     }
 
     s.from = nextPhase === "inbound" ? originOf(obs.description, prevPhase, s) : null;
-    s.country = Phase.liveCountryCode(obs.state, obs.description);
+    if (!hospAbroad) s.country = Phase.liveCountryCode(obs.state, obs.description);
 
     s.arrivalAt = (nextPhase === "outbound" || nextPhase === "inbound")
       ? (obs.arrivalAt || s.arrivalAt) : null;
@@ -2377,7 +2395,7 @@ const Trip = (() => {
     load, save, sync, get, blank,
     adopt, replaceTail, stop, started, dayOver, flownCount, shared, applyShared, sameLeg,
     revision: () => revision,
-    apply, setBuy, boughtItem, extras, unitsBought, marginBought,
+    apply, phaseOf, setBuy, boughtItem, extras, unitsBought, marginBought,
     legCountry, shelfFor, shelfOptions, carryable,
     legs, currentLeg, currentIndex,
     lateness, staleFor, isStale, position, racing, earliestHome, canReplan, value,
@@ -2505,7 +2523,7 @@ const Tracker = (() => {
     }
 
     const status = Phase.statusFromBasic(basic);
-    const phaseNow = Phase.travelPhase(status.state, status.description, s.phase);
+    const phaseNow = Trip.phaseOf(status.state, status.description);
 
     const obs = {
       at: Date.now(),
@@ -4673,6 +4691,11 @@ const Style = (() => {
 #oracle-panel .o-field:last-child { border-bottom: 0; }
 #oracle-panel .o-field-label { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 500; }
 #oracle-panel .o-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+#oracle-panel svg.o-flag {
+  display: inline-block; width: 1.5em; height: 1em; margin-right: .4em;
+  vertical-align: -.16em; border-radius: 2px; overflow: hidden; flex: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
+}
 #oracle-panel .o-chip {
   appearance: none; font: inherit; font-size: 11px; cursor: pointer;
   padding: 3px 9px; border-radius: 999px;
@@ -4760,6 +4783,12 @@ const Style = (() => {
   padding-bottom: 10px; border-bottom: 1px solid var(--o-line);
 }
 #oracle-panel .o-notice-body { font-size: 14px; line-height: 1.65; max-width: 68ch; }
+#oracle-panel .o-notice-body.is-clamped {
+  max-height: 8.25em; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+}
+#oracle-panel .o-notice > button.o-link { margin-top: 6px; font-size: 12px; font-weight: 600; }
 #oracle-panel .o-notice-body p { margin: 0 0 12px; }
 #oracle-panel .o-notice-body > :last-child { margin-bottom: 0; }
 #oracle-panel .o-notice-body strong { color: inherit; font-weight: 700; }
@@ -4830,6 +4859,82 @@ const Style = (() => {
   }
 
   return { install, CSS };
+})();
+
+const Flags = (() => {
+  "use strict";
+
+  const rect = (x, y, w, h, fill) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>`;
+
+  function star(cx, cy, r, turn = 0) {
+    const pts = [];
+    for (let i = 0; i < 10; i++) {
+      const a = turn + (i * Math.PI) / 5 - Math.PI / 2;
+      const d = i % 2 ? r * 0.382 : r;
+      pts.push((cx + d * Math.cos(a)).toFixed(2) + "," + (cy + d * Math.sin(a)).toFixed(2));
+    }
+    return `<polygon points="${pts.join(" ")}" fill="#FFDE00"/>`;
+  }
+
+  function unionJack(x, y, w, h) {
+    const diag = "M0,0L60,30M60,0L0,30";
+    const cross = "M30,0V30M0,15H60";
+    return `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="0 0 60 30" preserveAspectRatio="none">`
+      + rect(0, 0, 60, 30, "#012169")
+      + `<path d="${diag}" stroke="#fff" stroke-width="6"/>`
+      + `<path d="${diag}" stroke="#C8102E" stroke-width="2"/>`
+      + `<path d="${cross}" stroke="#fff" stroke-width="10"/>`
+      + `<path d="${cross}" stroke="#C8102E" stroke-width="6"/></svg>`;
+  }
+
+  const MAPLE = "M15,3.2L16.1,5.4L17.4,4.8L17,8.6L18.9,6.8L19.5,8.1L21.2,7.8L20.6,9.9L21.4,10.4"
+    + "L18.2,13L18.6,14.2L15.4,13.8L15.35,17H14.65L14.6,13.8L11.4,14.2L11.8,13L8.6,10.4"
+    + "L9.4,9.9L8.8,7.8L10.5,8.1L11.1,6.8L13,8.6L12.6,4.8L13.9,5.4Z";
+
+  const ART = {
+    mex: rect(0, 0, 10, 20, "#006847") + rect(10, 0, 10, 20, "#fff") + rect(20, 0, 10, 20, "#CE1126")
+      + `<circle cx="15" cy="10" r="2.9" fill="none" stroke="#4E7D2E" stroke-width=".7"/>`
+      + `<ellipse cx="15" cy="9.6" rx="1.5" ry="1.9" fill="#8A5A2B"/>`,
+    cay: rect(0, 0, 30, 20, "#012169") + unionJack(0, 0, 15, 10)
+      + `<ellipse cx="22.5" cy="6" rx="1.5" ry=".8" fill="#3A9B5C"/>`
+      + `<path d="M20,7.2H25V11.2Q25,14.4 22.5,15.6Q20,14.4 20,11.2Z" fill="#fff"/>`
+      + rect(20, 7.2, 5, 2, "#C8102E")
+      + `<path d="M20.4,11.3Q21.45,10.6 22.5,11.3T24.6,11.3M20.6,13Q21.55,12.3 22.5,13T24.4,13" `
+      + `fill="none" stroke="#012169" stroke-width=".55"/>`,
+    can: rect(0, 0, 30, 20, "#fff") + rect(0, 0, 7.5, 20, "#D52B1E") + rect(22.5, 0, 7.5, 20, "#D52B1E")
+      + `<path d="${MAPLE}" fill="#D52B1E"/>`,
+    haw: [0, 1, 2, 3, 4, 5, 6, 7].map((i) => rect(0, i * 2.5, 30, 2.5, ["#fff", "#C8102E", "#012169"][i % 3])).join("")
+      + unionJack(0, 0, 15, 10),
+    uni: unionJack(0, 0, 30, 20),
+    arg: rect(0, 0, 30, 20, "#74ACDF") + rect(0, 6.67, 30, 6.66, "#fff")
+      + `<circle cx="15" cy="10" r="2.5" fill="none" stroke="#F6B40E" stroke-width="1.1" stroke-dasharray=".55 .43"/>`
+      + `<circle cx="15" cy="10" r="1.5" fill="#F6B40E" stroke="#85340A" stroke-width=".25"/>`,
+    swi: rect(0, 0, 30, 20, "#DA291C") + rect(13.125, 3.75, 3.75, 12.5, "#fff") + rect(8.75, 8.125, 12.5, 3.75, "#fff"),
+    jap: rect(0, 0, 30, 20, "#fff") + `<circle cx="15" cy="10" r="6" fill="#BC002D"/>`,
+    chi: rect(0, 0, 30, 20, "#EE1C25") + star(5, 5, 3)
+      + star(10, 2, 1, 0.9) + star(12, 4, 1, 1.4) + star(12, 7, 1, 2.1) + star(10, 9, 1, 2.6),
+    uae: rect(0, 0, 30, 6.67, "#00732F") + rect(0, 6.67, 30, 6.66, "#fff") + rect(0, 13.33, 30, 6.67, "#000")
+      + rect(0, 0, 7.5, 20, "#FF0000"),
+    sou: rect(0, 0, 30, 10, "#E03C31") + rect(0, 10, 30, 10, "#001489")
+      + `<path d="M0,0L11,10L0,20M11,10H30" fill="none" stroke="#fff" stroke-width="6.67"/>`
+      + `<path d="M0,0L11,10L0,20M11,10H30" fill="none" stroke="#007749" stroke-width="4"/>`
+      + `<polygon points="0,2.7 8.02,10 0,17.3" fill="#FFB612"/>`
+      + `<polygon points="0,4.5 6.05,10 0,15.5" fill="#000"/>`,
+  };
+
+  function flag(code) {
+    const art = ART[code];
+    if (!art) return "";
+    return `<svg class="o-flag" viewBox="0 0 30 20" aria-hidden="true" focusable="false">${art}`
+      + `<rect x=".25" y=".25" width="29.5" height="19.5" rx="1.5" fill="none" stroke="rgba(0,0,0,.2)" stroke-width=".5"/></svg>`;
+  }
+
+  function place(code) {
+    const c = Data.COUNTRIES[code];
+    return c ? flag(code) + Fmt.esc(c.name) : Fmt.esc(String(code || "").toUpperCase());
+  }
+
+  return { flag, place };
 })();
 
 const Fmt = (() => {
@@ -5509,7 +5614,7 @@ const ViewToday = (() => {
 
     const what = Fmt.esc(leg.units) + " x " + Fmt.esc(leg.item_name);
     const code = Trip.legCountry(i);
-    const where = Data.label(code);
+    const where = Flags.place(code);
 
     const offPlan = rt.flewTo !== null && rt.flewTo !== undefined;
 
@@ -5581,7 +5686,7 @@ const ViewToday = (() => {
   }
 
   function landingText(code, itemId, arrivalAt) {
-    if (!arrivalAt || !Oracle.haveToken()) return "";
+    if (!arrivalAt || arrivalAt <= Date.now() || !Oracle.haveToken()) return "";
     const got = loadLanding(code, itemId, arrivalAt);
     if (got.loading || got.failed) return "";
     return " " + Fmt.hitPct(got.hit) + "% confidence at landing"
@@ -5760,7 +5865,7 @@ const ViewToday = (() => {
         <td class="clock">${Fmt.esc(Fmt.clock(rt.departedAt || leg.depart))}
           <span class="o-sub">${legState(i, rt, now)}</span></td>
         <td>${what}
-          <span class="o-sub">${Fmt.esc(Data.label(Trip.legCountry(i)))}${note}${conf}</span></td>
+          <span class="o-sub">${Flags.place(Trip.legCountry(i))}${note}${conf}</span></td>
         <td class="num o-col-mid money">${Fmt.esc(Fmt.money(spend))}
           <span class="o-sub">${Fmt.esc(Fmt.price(leg.unit_cost || 0))} each</span></td>
         <td class="num clock o-col-extra">${Fmt.esc(Fmt.clock(landAt))}
@@ -5794,7 +5899,7 @@ const ViewToday = (() => {
       const runs = day.map((leg) => `<li>
           <span class="clock">${Fmt.esc(Fmt.clock(leg.depart))}</span>
           <span>${Fmt.esc(leg.units)} x ${Fmt.esc(leg.item_name)}
-            <span class="o-sub">${Fmt.esc(Data.label(leg.country))}${typeof leg.hit === "number"
+            <span class="o-sub">${Flags.place(leg.country)}${typeof leg.hit === "number"
               ? " · " + Fmt.esc(Fmt.hitPct(leg.hit)) + "% confidence" : ""}</span></span>
         </li>`).join("");
       return `<div class="o-choice">
@@ -6068,7 +6173,8 @@ const ViewShops = (() => {
     const pos = Trip.position();
     if (!pos.known || pos.phase !== "outbound" || t.country !== code) return null;
     const i = Trip.currentIndex();
-    return (i >= 0 && t.runtime[i].arrivalAt) || t.arrivalAt || null;
+    const at = (i >= 0 && t.runtime[i].arrivalAt) || t.arrivalAt || null;
+    return at && at > Date.now() ? at : null;
   }
 
   function currentCountry() {
@@ -6152,7 +6258,7 @@ const ViewShops = (() => {
   function ensureChrome(el) {
     if (el.querySelector(".o-shop-head")) return;
     const picker = Data.list().map((c) =>
-      `<option value="${c.code}">${Fmt.esc(c.flag + " " + c.name)}</option>`
+      `<option value="${c.code}">${Fmt.esc(c.name)}</option>`
     ).join("");
     el.innerHTML = `<div class="o-acts o-shop-head" style="margin-top:0">
       <select data-act="country">${picker}</select>
@@ -6515,7 +6621,7 @@ const ViewMuseum = (() => {
     return item.shops.map((s) => {
       const code = Data.CODE_BY_NAME[String(s.country || "").toLowerCase()];
       return code
-        ? `<button type="button" class="o-link" data-shops="${code}">${Fmt.esc(Data.label(code))}</button>`
+        ? `<button type="button" class="o-link" data-shops="${code}">${Flags.place(code)}</button>`
         : Fmt.esc(s.shop || s.country || "");
     }).join(", ");
   }
@@ -6770,7 +6876,7 @@ const ViewWatches = (() => {
       }
       return `<tr>
         <td>${Fmt.esc(w.name)}
-          <span class="o-sub">${Fmt.esc(Data.label(w.country))}</span></td>
+          <span class="o-sub">${Flags.place(w.country)}</span></td>
         <td class="num">${(w.quantity || 0) > 0
             ? `<span class="go">${Fmt.esc(Fmt.count(w.quantity))}</span>`
             : '<span class="muted">0</span>'}
@@ -6804,7 +6910,7 @@ const ViewWatches = (() => {
     }
     const countries = Data.list().map((c) =>
       `<option value="${c.code}"${c.code === form.country ? " selected" : ""}
-        >${Fmt.esc(c.flag + " " + c.name)}</option>`).join("");
+        >${Fmt.esc(c.name)}</option>`).join("");
     return `<div class="o-group" style="margin-top:10px">
       <h4>New watch</h4>
       <div class="o-field">
@@ -7083,7 +7189,7 @@ const ViewItems = (() => {
                                   stamp(s.observed_at));
       const flight = Data.flightMinutes(s.country, travel);
       return `<tr>
-        <td>${Fmt.esc(Data.label(s.country))}
+        <td>${Flags.place(s.country)}
           <span class="o-sub">${flight ? Fmt.esc(flight + " min each way") : ""}</span></td>
         <td class="num">${qty > 0
             ? `<span class="go">${Fmt.esc(Fmt.count(qty))}</span>`
@@ -7256,7 +7362,7 @@ const ViewSettings = (() => {
       case "codes":
         return `<span class="o-chips">${Data.list().map((c) =>
           `<button type="button" class="o-chip${v.includes(c.code) ? " is-on" : ""}"
-                   data-toggle="${r.name}" data-value="${c.code}">${Fmt.esc(c.flag + " " + c.name)}</button>`
+                   data-toggle="${r.name}" data-value="${c.code}">${Flags.place(c.code)}</button>`
         ).join("")}</span>`;
       case "types":
         return `<span class="o-chips">${Data.ITEM_TYPES.map((t) =>
@@ -7863,16 +7969,13 @@ const ViewExports = (() => {
     }
     const cap = Settings.get("capacity");
     const shown = expanded ? data.rows : data.rows.slice(0, ROW_CAP);
-    const rows = shown.map((r) => {
-      const c = Data.COUNTRIES[r.country];
-      return `<tr>
-        <td>${Fmt.esc(r.name)}<span class="o-sub">${Fmt.esc(c ? c.flag + " " + c.name : r.country)}</span></td>
+    const rows = shown.map((r) => `<tr>
+        <td>${Fmt.esc(r.name)}<span class="o-sub">${Flags.place(r.country)}</span></td>
         <td class="num">${Fmt.esc(Fmt.price(r.pays))}<span class="o-sub">Torn ${Fmt.esc(Fmt.price(r.market_value))}</span></td>
         <td class="num"><span class="go">+${Fmt.esc(Fmt.price(r.margin))}</span>
           <span class="o-sub">${Fmt.esc(Fmt.money(r.margin * cap))} for ${Fmt.esc(Fmt.count(cap))}</span></td>
         <td class="num">${Fmt.esc(Fmt.count(r.quantity))}</td>
-      </tr>`;
-    }).join("");
+      </tr>`).join("");
     const more = data.rows.length > ROW_CAP
       ? `<button type="button" class="o-btn" data-act="expand">${expanded ? "Fewer" : "All " + data.rows.length}</button>`
       : "";
@@ -7920,7 +8023,12 @@ const Assist = (() => {
 
   function plain(html) {
     try {
-      return new DOMParser().parseFromString(String(html), "text/html").body.textContent.trim();
+      const body = new DOMParser().parseFromString(String(html), "text/html").body;
+      for (const el of body.querySelectorAll(".counter-wrap[data-time]")) {
+        el.textContent = Fmt.duration(Number(el.dataset.time) * 1000);
+      }
+      for (const el of body.querySelectorAll("br, p, div, li")) el.after(" ");
+      return body.textContent.replace(/\s+/g, " ").trim();
     } catch (e) {
       return String(html);
     }
@@ -7964,12 +8072,35 @@ const Assist = (() => {
     return Array.isArray(slots) ? slots : [];
   }
 
+  let slots = null;
+  let slotsLoading = null;
+
+  function readSlots() {
+    if (!slotsLoading) {
+      slotsLoading = travelData("inventory").then((inv) => {
+        slotsLoading = null;
+        const list = slotsOf(inv.data);
+        slots = inv.ok || list.length ? list : null;
+        return inv;
+      });
+    }
+    return slotsLoading;
+  }
+
   async function useItem(ref) {
-    const inv = await travelData("inventory");
-    if (!inv.ok && !slotsOf(inv.data).length) return inv;
-    const slot = slotsOf(inv.data).find((s) => s && s.item && Number(s.item.ID) === ref.id);
-    if (!slot) return { ok: false, message: "No " + ref.name + " in your travel inventory." };
-    return travelData("useItem", { method: "POST", body: { slotID: slot.ID } });
+    const holds = (s) => s && s.item && Number(s.item.ID) === ref.id;
+    const inv = Page.travelInventory();
+    const onPage = inv ? inv.items.filter((n) => n === ref.name).length : Infinity;
+    if (!slots || onPage < slots.filter(holds).length) {
+      const read = await readSlots();
+      if (!slots) return read;
+    }
+    const i = slots.findIndex(holds);
+    if (i < 0) return { ok: false, message: "No " + ref.name + " in your travel inventory." };
+    const [slot] = slots.splice(i, 1);
+    const res = await travelData("useItem", { method: "POST", body: { slotID: slot.ID } });
+    if (!res.ok) slots = null;
+    return res;
   }
 
   async function packItem(ref) {
@@ -8036,6 +8167,7 @@ const Assist = (() => {
   }
 
   function inHospital() {
+    if (visit().medOut) return false;
     if (observed && observed.at > loadedAt) return observed.state === "Hospital";
     return Page.hospitalLayout();
   }
@@ -8056,27 +8188,33 @@ const Assist = (() => {
       kit: Settings.get("assist_kit"),
       track: tracked(),
       carried: inv ? inv.items : null,
+      room: inv ? inv.slots - inv.packed : null,
       hospital: inHospital(),
-      inbound: Trip.get().phase === "inbound",
+      outbound: Trip.get().phase === "outbound",
       rows: mode === "abroad" ? Page.shopRows() : [],
       wallet: mode === "abroad" ? Page.shopWallet() : null,
       bought: v.bought === true,
+      medOut: v.medOut === true,
       hospUsed: v.hospUsed === true,
     };
   }
 
   function decide(f) {
     const count = (ref) => (ref && f.carried ? f.carried.filter((n) => n === ref.name).length : 0);
-    const kit = f.kit || { hosp: null, med: null, meds: 0 };
+    const kit = f.kit || { hosp: null, med: null, meds: 0, extras: [] };
 
     if (f.mode === "agency") {
       const need = [];
       if (kit.hosp) need.push({ ref: kit.hosp, n: 1 });
       if (kit.med && kit.meds > 0) need.push({ ref: kit.med, n: kit.meds });
+      for (const e of kit.extras || []) need.push({ ref: { id: e.id, name: e.name }, n: e.n });
       if (!need.length || !f.carried) return null;
       for (const { ref, n } of need) {
         const have = count(ref);
         if (have < n) {
+          if (f.room !== null && f.room <= 0) {
+            return { label: "Your bag is full", note: "No room for " + ref.name + "." };
+          }
           return { act: "pack", ref, label: "Pack " + ref.name + " (" + (have + 1) + " of " + n + ")" };
         }
       }
@@ -8084,9 +8222,11 @@ const Assist = (() => {
     }
 
     if (f.mode === "flight") {
-      if (!kit.hosp || f.inbound) return null;
+      if (!kit.hosp || !f.outbound) return null;
       if (f.hospUsed) return { label: "Self-hosp used", note: "You land in hospital." };
-      return { act: "use", ref: kit.hosp, label: "Self-hosp now", note: "You land in hospital." };
+      if (f.carried && !count(kit.hosp)) return null;
+      return { act: "use", ref: kit.hosp, label: "Self-hosp",
+               note: "You can self-hosp close to landing, or wait till after you land." };
     }
 
     if (f.mode !== "abroad" || !f.wallet) return null;
@@ -8100,9 +8240,18 @@ const Assist = (() => {
     const stock = shelves.reduce((sum, x) => sum + x.row.stock, 0);
     const names = f.track.map((r) => r.name).join(", ");
 
-    const want = f.hospital ? free + meds : free;
+    const want = f.hospital && meds ? free + 1 : free;
     const ready = want > 0 && shelves.length > 0 && stock >= want;
     const watching = names ? "Watching " + names : "Pick items to watch on the Assist tab";
+
+    const buy = () => {
+      for (const x of shelves) {
+        if (x.row.stock <= 0 || !x.row.price) continue;
+        const amount = Math.min(x.row.stock, free, Math.floor(f.wallet.money / x.row.price));
+        if (amount > 0) return { act: "buy", ref: x.ref, amount, ready, label: "Buy " + amount + " " + x.ref.name };
+      }
+      return null;
+    };
 
     if (f.hospital) {
       if (!ready) return { label: watching, note: want + " slots to fill.", ready, watch: true };
@@ -8110,28 +8259,25 @@ const Assist = (() => {
         return { act: "use", ref: kit.med, ready,
                  label: "Med out (" + meds + " left)", note: "Restocked: " + stock + " in stock." };
       }
-      return { label: "Restocked", note: "No med-out items left. Buy when your hospital time ends.", ready };
+
+      const step = buy();
+      if (step) return Object.assign(step, { note: "Torn takes it when your hospital time ends." });
+      return { label: "Restocked", note: "Buy when your hospital time ends.", ready };
     }
 
-    if (free === 0) {
-      return f.bought ? { act: "fly", label: "Fly home", ready } : { label: "Your bag is full", ready };
+    if (free === 0 && f.medOut && !f.bought) return { label: "Your bag is full", ready };
+
+    if (free === 0 && !(hospLeft && meds)) {
+      return { act: "fly", label: "Fly home", note: "Your bag is full.", ready };
     }
 
-    for (const x of shelves) {
-      if (x.row.stock <= 0 || !x.row.price) continue;
-      const amount = Math.min(x.row.stock, free, Math.floor(f.wallet.money / x.row.price));
-      if (amount <= 0) continue;
-      if (ready || f.bought || !hospLeft) {
-        return { act: "buy", ref: x.ref, amount, ready,
-                 label: "Buy " + amount + " " + x.ref.name };
-      }
-      break;
-    }
-    if (f.bought) return { act: "fly", label: "Fly home", ready };
+    const step = buy();
+    if (step) return step;
     if (hospLeft) {
       return { act: "use", ref: kit.hosp, ready,
                label: "Self-hosp", note: "Waits in hospital, safe from muggers." };
     }
+    if (f.bought) return { act: "fly", label: "Fly home", note: free + " slots still free.", ready };
     return { label: watching, note: free + " slots to fill.", ready, watch: true };
   }
 
@@ -8156,13 +8302,21 @@ const Assist = (() => {
     let res;
     try { res = await ACTIONS[step.act](step); }
     finally { busy = false; }
+    const kit = Settings.get("assist_kit");
+    const med = step.act === "use" && !!kit.med && step.ref.id === kit.med.id;
     if (res.ok) {
       if (step.act === "buy") markVisit({ bought: true });
       if (step.act === "use" && Page.mode() === "flight") markVisit({ hospUsed: true });
+
+      if (step.act === "use") markVisit({ medOut: med });
       settle = { until: Date.now() + SETTLE_MS, key: pageKey() };
       setTimeout(paint, SETTLE_MS + 50);
       try { window.dispatchEvent(new Event("focus")); } catch (e) {  }
       if (step.act === "use") Tracker.poke();
+    } else if (step.act === "buy" && visit().medOut && kit.med
+               && (facts().carried || []).includes(kit.med.name)) {
+
+      markVisit({ medOut: false });
     }
     message = res.message ? { text: res.message, tone: res.ok ? "" : "warn" } : null;
     Env.log.event("assist " + step.act + (res.ok ? " ok" : " refused") + ": " + (res.message || ""));
@@ -8226,7 +8380,7 @@ const Assist = (() => {
 
     const v = visit();
     if (mode === "agency" && Object.keys(v).length) Env.write(VISIT_KEY, {});
-    if (mode === "flight" && v.bought) markVisit({ bought: false });
+    if (mode === "flight" && (v.bought || v.medOut)) markVisit({ bought: false, medOut: false });
     if (mode === "abroad" && v.hospUsed) markVisit({ hospUsed: false });
     if (mode === "abroad" && !focused()) {
       if (!drawn) bar.hidden = true;
@@ -8234,6 +8388,11 @@ const Assist = (() => {
     }
     const f = facts();
     const step = decide(f);
+    const kit = f.kit || {};
+    if ((mode === "flight" || mode === "abroad") && (kit.hosp || kit.med) && !slots && !slotsLoading
+        && focused()) {
+      readSlots();
+    }
     if (mode === "abroad") {
       noticeReady(step);
       loadWindows();
@@ -8274,7 +8433,7 @@ const Assist = (() => {
 
   function schedule() {
     if (pending) return;
-    pending = setTimeout(() => { pending = null; paint(); }, 250);
+    pending = requestAnimationFrame(() => { pending = null; paint(); });
   }
 
   function watchShop() {
@@ -8288,6 +8447,10 @@ const Assist = (() => {
   function mount() {
     const first = !bar;
     if (first) build();
+
+    if (first && Page.mode() === "abroad" && Page.hospitalLayout() && visit().medOut) {
+      markVisit({ medOut: false });
+    }
     if (Page.mode() === "other") {
       if (bar.parentNode) bar.parentNode.removeChild(bar);
       return;
@@ -8308,8 +8471,8 @@ const Assist = (() => {
 
   function kitPacked(items) {
     const kit = Settings.get("assist_kit");
-    const names = [kit.hosp, kit.med].filter(Boolean).map((r) => r.name);
-    return (items || []).filter((n) => names.includes(n)).length;
+    const n = (ref) => (ref ? (items || []).filter((x) => x === ref.name).length : 0);
+    return Math.min(n(kit.hosp), 1) + Math.min(n(kit.med), 1);
   }
 
   return { mount, paint, decide, onObservation, kitPacked, tracked };
@@ -8390,6 +8553,19 @@ const ViewAssist = (() => {
           <input type="number" data-kit="meds" min="0" max="${Settings.MAX_MEDS}" step="1"
                  value="${kit.meds}"></div>
       </div>
+      <div class="o-group"><h4>Other items to pack</h4>
+        ${kit.extras.length ? `<div class="o-chips">${kit.extras.map((e) => `
+          <span class="o-chip is-on">${Fmt.esc(e.name)} × ${e.n}
+            <button type="button" class="o-link" data-unpack="${e.id}" aria-label="Remove">×</button>
+          </span>`).join("")}</div>` : ""}
+        <p class="o-note">Extra items may reduce how many items you can buy abroad.</p>
+        ${kit.extras.length < Settings.MAX_EXTRAS ? `<div class="o-keyform">
+          <input type="text" data-extra list="oracle-all-items" autocomplete="off"
+                 placeholder="Add an item to pack">
+          <input type="number" data-extra-n min="1" max="${Settings.MAX_EXTRA_COUNT}" step="1"
+                 value="1" aria-label="How many" style="width:4.5em">
+          <button type="button" class="o-btn" data-act="pack">Add</button></div>` : ""}
+      </div>
       <div class="o-group"><h4>Tracked items</h4>
         ${track.length ? `<div class="o-chips">${track.map((ref, i) => `
           <span class="o-chip is-on">${i + 1}. ${Fmt.esc(ref.name)}${picked.length ? `
@@ -8411,8 +8587,10 @@ const ViewAssist = (() => {
 
   function setKit(patch) {
     const next = Object.assign({}, Settings.get("assist_kit"), patch);
-    if (next.hosp && next.med && next.hosp.id === next.med.id) {
-      tell("Pick a different item for self-hosp and med-out.", "warn");
+    const ids = [next.hosp, next.med].filter(Boolean).map((r) => r.id)
+      .concat(next.extras.map((e) => e.id));
+    if (new Set(ids).size !== ids.length) {
+      tell("Each item can be in the kit once.", "warn");
       Panel.refresh("assist", true);
       return;
     }
@@ -8427,9 +8605,28 @@ const ViewAssist = (() => {
     if (!name.trim()) return;
     const hit = find(name, true);
     if (!hit) { tell("No item sold abroad is named " + name.trim() + ".", "warn"); return; }
+    if (Settings.get("assist_track").some((r) => r.id === hit.id)) {
+      tell(hit.name + " is already tracked.", "warn");
+      return;
+    }
     Settings.set("assist_track", [...Settings.get("assist_track"), { id: hit.id, name: hit.name }]);
     Assist.paint();
     Panel.refresh("assist", true);
+  }
+
+  function addExtra(el) {
+    const input = el.querySelector("[data-extra]");
+    const name = input ? input.value : "";
+    if (!name.trim()) return;
+    const hit = find(name, false);
+    if (!hit) { tell("No item is named " + name.trim() + ".", "warn"); return; }
+    const n = Math.round(Number(el.querySelector("[data-extra-n]").value));
+    if (!(n >= 1 && n <= Settings.MAX_EXTRA_COUNT)) {
+      tell("Pack between 1 and " + Settings.MAX_EXTRA_COUNT + ".", "warn");
+      return;
+    }
+    const extras = Settings.get("assist_kit").extras;
+    setKit({ extras: [...extras, { id: hit.id, name: hit.name, n }] });
   }
 
   function wire(el) {
@@ -8448,9 +8645,20 @@ const ViewAssist = (() => {
     if (track) {
       track.addEventListener("keydown", (ev) => { if (ev.key === "Enter") addTracked(el); });
     }
+    const extra = el.querySelector("[data-extra]");
+    if (extra) {
+      extra.addEventListener("keydown", (ev) => { if (ev.key === "Enter") addExtra(el); });
+    }
+    for (const btn of el.querySelectorAll("[data-unpack]")) {
+      btn.addEventListener("click", () => {
+        const id = Number(btn.dataset.unpack);
+        setKit({ extras: Settings.get("assist_kit").extras.filter((e) => e.id !== id) });
+      });
+    }
     for (const btn of el.querySelectorAll("[data-act]")) {
       btn.addEventListener("click", () => {
         if (btn.dataset.act === "track") addTracked(el);
+        if (btn.dataset.act === "pack") addExtra(el);
         if (btn.dataset.act === "retry") { error = null; loadCatalogue(); }
       });
     }
@@ -8535,6 +8743,9 @@ const ViewNews = (() => {
   "use strict";
 
   const freshNow = new Set();
+  const opened = new Set();
+
+  const isLong = (text) => String(text).length > 280 || String(text).split("\n").length > 4;
 
   function inline(text) {
     return Fmt.esc(text)
@@ -8569,9 +8780,19 @@ const ViewNews = (() => {
       <article class="o-notice">
         <h4>${Fmt.esc(n.title)}${freshNow.has(n.id) ? ' <span class="o-new">New</span>' : ""}</h4>
         <div class="o-notice-when">${Fmt.esc(new Date(n.created_at).toLocaleDateString())}</div>
-        <div class="o-notice-body">${body(n.body)}</div>
+        <div class="o-notice-body${isLong(n.body) && !opened.has(n.id) ? " is-clamped" : ""}">${body(n.body)}</div>
+        ${isLong(n.body) ? `<button type="button" class="o-link" data-more="${Fmt.esc(String(n.id))}">${
+          opened.has(n.id) ? "Show less" : "Read more"}</button>` : ""}
       </article>`).join("")
       : '<div class="o-empty"><p>No announcements.</p></div>';
+    for (const btn of el.querySelectorAll("[data-more]")) {
+      btn.addEventListener("click", () => {
+        const n = notices.find((x) => String(x.id) === btn.dataset.more);
+        if (!n) return;
+        if (opened.has(n.id)) opened.delete(n.id); else opened.add(n.id);
+        Panel.refresh("news", true);
+      });
+    }
     News.markRead();
   }
 
@@ -8720,6 +8941,7 @@ Env.ready().then(function boot() {
     if (names.includes("escort_on") || names.includes("post_plan")) Escort.sync({ pressed: true });
     Panel.applyTheme();
     Panel.refresh();
+    Assist.paint();
   });
 
   if (Oracle.haveToken()) {
