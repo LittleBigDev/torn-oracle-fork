@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.4-fork
+// @version      2.6.4-fork.1
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.4 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
@@ -6390,7 +6390,7 @@ const ViewShops = (() => {
         <td class="num o-col-mid">${m === null ? '<span class="muted">—</span>'
             : `<span class="${m > 0 ? "go" : "muted"} money">${Fmt.esc(Fmt.price(m))}</span>
                <span class="o-sub">${cap ? Fmt.esc(Fmt.money(m * cap) + " total") : "each"}</span>`}</td>
-        <td class="o-col-mid">${Fmt.esc(Data.channel(item.market_value, item.sell_price, item.name) || "—")}</td>
+        <td>${Fmt.esc(Data.channel(item.market_value, item.sell_price, item.name) || "—")}</td>
         <td class="num o-col-extra">${ppm === null ? '<span class="muted">—</span>'
             : `<span class="${ppm > 0 ? "go" : "muted"} money">${Fmt.esc(Fmt.price(ppm))}</span>`}</td>
         ${data.landAt ? ""
@@ -6412,7 +6412,7 @@ const ViewShops = (() => {
           Land ${Fmt.esc(Fmt.clock(data.landAt))}</th>` : ""}
         <th class="num o-col-extra" title="When the shelf is expected to restock">Restock</th>
         <th class="num o-col-mid" title="Profit per item">Margin</th>
-        <th class="o-col-mid" title="Best place to sell">Sell</th>
+        <th title="Best place to sell">Sell</th>
         <th class="num o-col-extra" title="Profit per minute of flight time">Profit/min</th>
         ${data.landAt ? ""
           : `<th class="num" title="When to leave Torn">Board</th>
