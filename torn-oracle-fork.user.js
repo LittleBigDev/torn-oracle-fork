@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.4-fork.1
+// @version      2.6.5-fork.1
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.4 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
+// @description  Fork de Torn Oracle: Travel 2.6.5 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -682,7 +682,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.4";
+  const SCRIPT_VERSION = "2.6.5";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -4186,7 +4186,7 @@ const Page = (() => {
   function onFormChange(fn) {
     let type = selectedTravelType();
     let dest = selectedDestination();
-    let packed = inventoryKey(travelInventory());
+    let packed = "";
     let timer = null;
     const check = () => {
       timer = null;
@@ -4196,7 +4196,7 @@ const Page = (() => {
       const d = selectedDestination();
       if (d && d !== dest) fn("destination", d);
       dest = d || dest;
-      const inv = travelInventory();
+      const inv = mode() === "agency" ? travelInventory() : null;
       const k = inventoryKey(inv);
       if (inv && k !== packed) fn("inventory", inv);
       packed = k;
@@ -8469,13 +8469,34 @@ const Assist = (() => {
   window.addEventListener("focus", () => schedule());
   document.addEventListener("visibilitychange", () => schedule());
 
-  function kitPacked(items) {
-    const kit = Settings.get("assist_kit");
-    const n = (ref) => (ref ? (items || []).filter((x) => x === ref.name).length : 0);
-    return Math.min(n(kit.hosp), 1) + Math.min(n(kit.med), 1);
+  let typeByName = null;
+
+  async function itemTypes() {
+    if (!typeByName) {
+      const payload = await Torn.items();
+      const list = Array.isArray(payload.items) ? payload.items : Object.values(payload.items || {});
+      typeByName = new Map(list.map((it) => [it.name, Data.itemType(it.type)]));
+    }
+    return typeByName;
   }
 
-  return { mount, paint, decide, onObservation, kitPacked, tracked };
+  async function keptPacked(items) {
+    const kit = Settings.get("assist_kit");
+    const extras = new Set(kit.extras.map((e) => e.name));
+    const used = new Set([kit.hosp, kit.med].filter(Boolean).map((r) => r.name));
+    let kept = items.filter((name) => extras.has(name)).length;
+    const others = items.filter((name) => !extras.has(name) && !used.has(name));
+    if (!others.length) return kept;
+    let types;
+    try { types = await itemTypes(); } catch (e) { return null; }
+    for (const name of others) {
+      const type = types.get(name);
+      if (type === "Weapon" || type === "Armor") kept += 1;
+    }
+    return kept;
+  }
+
+  return { mount, paint, decide, onObservation, keptPacked, tracked };
 })();
 
 const ViewAssist = (() => {
@@ -8850,6 +8871,7 @@ Env.ready().then(function boot() {
 
   window.addEventListener("hashchange", Page.followLink);
 
+  let inventoryReads = 0;
   readForm = Page.onFormChange((name, value) => {
     if (!Settings.get("follow_page")) return;
     if (name === "travelType") {
@@ -8858,8 +8880,12 @@ Env.ready().then(function boot() {
     }
     if (name === "inventory") {
 
-      const free = Math.max(1, value.slots - value.packed + Assist.kitPacked(value.items));
-      if (Settings.get("capacity") !== free) { Settings.set("capacity", free); Panel.refresh(); }
+      const read = ++inventoryReads;
+      Assist.keptPacked(value.items).then((kept) => {
+        if (kept === null || read !== inventoryReads) return;
+        const free = Math.max(1, value.slots - kept);
+        if (Settings.get("capacity") !== free) { Settings.set("capacity", free); Panel.refresh(); }
+      });
     }
     if (name === "destination") {
 
