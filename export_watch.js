@@ -110,8 +110,7 @@ const ExportWatch = (() => {
 
   function line(w, r, n) {
     return `${w.name}: ${Fmt.price(r.price)} (${r.where}, ${Fmt.count(r.qty)} for sale). `
-      + `+${Fmt.price(r.margin)} each in ${Data.name(w.code)}, `
-      + `${Fmt.money(r.margin * Math.min(n, r.qty))} for ${Fmt.count(Math.min(n, r.qty))}.`;
+      + `+${Fmt.price(r.margin)} each in ${Data.name(w.code)}.`;
   }
 
   function paint() {
