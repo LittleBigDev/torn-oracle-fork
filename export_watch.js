@@ -221,7 +221,7 @@ const ExportWatch = (() => {
       const r = rows[keyOf(w)];
       const cells = !r ? '<td colspan="3" class="muted">Waiting…</td>'
         : r.error ? `<td colspan="3" class="muted">${Fmt.esc(r.error)}</td>`
-        : `<td class="num">${Fmt.esc(Fmt.price(r.price))}<span class="o-sub"><a href="${Fmt.esc(r.url)}">${Fmt.esc(r.where)}</a></span></td>
+        : `<td class="num">${Fmt.esc(Fmt.price(r.price))}<span class="o-sub"><a href="${Fmt.esc(r.url)}" style="color:var(--o-accent)">${Fmt.esc(r.where)}</a></span></td>
            <td class="num">${Fmt.esc(Fmt.price(r.pays))}</td>
            <td class="num"><span class="${r.margin >= w.min ? "go" : "muted"}">${r.margin >= 0 ? "+" : ""}${
              Fmt.esc(Fmt.price(r.margin))}</span><span class="o-sub">${Fmt.esc(Fmt.money(r.margin * units()))}</span></td>`;
