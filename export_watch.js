@@ -231,11 +231,11 @@ const ExportWatch = (() => {
     }).join("");
     const items = shopItems[form.code] || [];
     el.innerHTML = `
+      <label class="o-field"><input type="checkbox" data-ew="notify"${Env.read(NOTIFY, true) ? " checked" : ""}>
+        Enable notifications</label>
       ${lines ? `<div class="o-scroll"><table><thead><tr><th>Item</th><th class="num">Torn now</th>
         <th class="num">Shop pays</th><th class="num">Margin</th><th class="num">Alert at</th><th></th></tr></thead>
         <tbody>${lines}</tbody></table></div>` : '<div class="o-empty">No export watch yet.</div>'}
-      <label class="o-field"><input type="checkbox" data-ew="notify"${Env.read(NOTIFY, true) ? " checked" : ""}>
-        Enable notifications</label>
       <div class="o-note">Torn now: cheapest of the item market and bazaars (weav3r.dev). Margin total for
         ${Fmt.count(units())} items: suitcase ${Fmt.count(Settings.get("capacity"))} minus ${Fmt.count(kit)} in the trip kit.
         Checked every minute while a Torn page is open.</div>
