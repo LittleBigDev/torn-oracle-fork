@@ -135,12 +135,9 @@ const ExportWatch = (() => {
     if (!shown.length) { if (bar) bar.remove(); }
     else {
       if (!bar) {
+        style();
         bar = document.createElement("div");
         bar.id = BAR_ID;
-        // Même gabarit que le bouton d'Oracle : en haut du contenu, collant au défilement
-        bar.style.cssText = "position:sticky;top:0;z-index:50;box-sizing:border-box;width:100%;margin:0 0 8px;"
-          + "padding:8px 36px 8px 10px;color:#10161c;border-radius:10px;"
-          + "font:bold 13px/1.4 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
         bar.addEventListener("click", (ev) => {
           if (!ev.target.matches("[data-close]")) return;
           const now = shared();
@@ -150,22 +147,49 @@ const ExportWatch = (() => {
           paint();
         });
       }
-      // Au-dessus du bouton d'Oracle en voyage, sinon en tête du contenu ; replacé si Torn redessine la page
-      const anchor = document.getElementById("oracle-assist") || document.getElementById("travel-root");
+      // Sous le bouton d'Oracle en voyage (empilé quand on défile), sinon en tête du contenu ;
+      // replacé si Torn redessine la page
+      const assist = document.getElementById("oracle-assist");
+      const root = document.getElementById("travel-root");
       const wrap = document.querySelector(".content-wrapper");
-      if (anchor && anchor.parentNode) {
-        if (bar.nextSibling !== anchor) anchor.parentNode.insertBefore(bar, anchor);
+      if (assist && assist.parentNode && assist.isConnected) {
+        if (assist.nextSibling !== bar) assist.parentNode.insertBefore(bar, assist.nextSibling);
+      } else if (root && root.parentNode) {
+        if (bar.nextSibling !== root) root.parentNode.insertBefore(bar, root);
       } else if (wrap) {
         if (wrap.firstChild !== bar) wrap.insertBefore(bar, wrap.firstChild);
       } else if (!bar.isConnected) document.body.prepend(bar);
-      // Même couleur que le bouton d'Oracle (med out, achat, retour)
-      bar.style.background = Page.darkMode() ? "#2dd4bf" : "#0d9488";
-      bar.innerHTML = shown.map(([w, r]) => `<div>${Fmt.esc(line(w, r, n))}
-        <a href="${Fmt.esc(r.url)}" style="color:inherit;text-decoration:underline;margin-left:6px">Buy</a></div>`).join("")
-        + '<button type="button" data-close title="Hide until the price changes" style="position:absolute;'
-        + 'top:4px;right:6px;background:none;border:0;color:inherit;font-size:18px;cursor:pointer">&times;</button>';
+      bar.style.top = assist && assist.isConnected ? assist.offsetHeight + 4 + "px" : "0";
+      bar.classList.toggle("o-dark", Page.darkMode());
+      const [w, r] = shown[0];
+      bar.innerHTML = `<div class="oa-line"><span class="oa-brand">Torn Oracle</span>
+          <span class="oa-note">Export deal</span>
+          <button type="button" class="oa-x" data-close title="Hide until the price changes">&times;</button></div>
+        <a class="oa-go" href="${Fmt.esc(r.url)}">${Fmt.esc(line(w, r, n))}. Buy</a>`;
     }
     Panel.refresh("exportwatch");
+  }
+
+  // Repris du bouton d'Oracle (#oracle-assist), dont le style n'est chargé que sur la page de voyage
+  function style() {
+    if (document.getElementById(BAR_ID + "-css")) return;
+    const css = document.createElement("style");
+    css.id = BAR_ID + "-css";
+    css.textContent = `
+#${BAR_ID} { --oa-bg: #fff; --oa-line: #dde3e9; --oa-dim: #4a5763; --oa-accent: #0d9488;
+  position: sticky; top: 0; z-index: 50; box-sizing: border-box; width: 100%; margin: 0 0 8px;
+  padding: 8px 10px; border: 1px solid var(--oa-line); border-radius: 10px; background: var(--oa-bg);
+  color: #10161c; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+#${BAR_ID}.o-dark { --oa-bg: #171d24; --oa-line: #2c3742; --oa-dim: #b3c0cd; --oa-accent: #2dd4bf; color: #e7edf3; }
+#${BAR_ID} .oa-line { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+#${BAR_ID} .oa-brand { font-weight: 700; font-size: 11px; color: var(--oa-accent); }
+#${BAR_ID} .oa-note { font-size: 12px; color: var(--oa-dim); flex: 1; }
+#${BAR_ID} .oa-x { background: none; border: 0; color: var(--oa-dim); font-size: 18px; line-height: 1; cursor: pointer; }
+#${BAR_ID} a.oa-go { display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 100%; min-height: 44px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--oa-accent);
+  background: var(--oa-accent); color: #fff; font-size: 15px; font-weight: 700; text-align: center;
+  text-decoration: none; }`;
+    document.head.appendChild(css);
   }
 
   function start() {
