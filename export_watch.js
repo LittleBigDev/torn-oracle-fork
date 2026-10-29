@@ -14,19 +14,11 @@ const ExportWatch = (() => {
   const shared = () => Env.read(SHARED, { at: 0, rows: {}, notified: {}, dismissed: {} });
   const keyOf = (w) => w.id + "|" + w.code;
 
-  // « Suitcase size » suit les places libres de l'agence, pas la taille de la valise : on retient le
-  // nombre de cases de la valise affichée par l'agence (vide ou pleine)
-  function suitcase() {
-    const inv = Page.travelInventory();
-    if (inv && inv.slots !== Env.read("fork_suitcase", 0)) Env.write("fork_suitcase", inv.slots);
-    return Env.read("fork_suitcase", 0) || Settings.get("capacity") || 0;
-  }
-
+  // Taille de valise réglée dans Oracle, moins le trip kit (self-hosp et objets de med-out)
   function units() {
     const kit = Settings.get("assist_kit") || {};
-    const packed = (kit.hosp ? 1 : 0) + (kit.med ? kit.meds || 0 : 0)
-      + (kit.extras || []).reduce((s, e) => s + (e.n || 0), 0);
-    return Math.max(0, suitcase() - packed);
+    const packed = (kit.hosp ? 1 : 0) + (kit.med ? kit.meds || 0 : 0);
+    return Math.max(0, (Settings.get("capacity") || 0) - packed);
   }
 
   function bazaar(id) {
@@ -221,7 +213,7 @@ const ExportWatch = (() => {
     }
     loadShop(form.code);
     const rows = shared().rows;
-    const kit = suitcase() - units();
+    const kit = Settings.get("capacity") - units();
     const lines = list().map((w) => {
       const r = rows[keyOf(w)];
       const cells = !r ? '<td colspan="3" class="muted">Waiting…</td>'
@@ -240,7 +232,7 @@ const ExportWatch = (() => {
         <th class="num">Shop pays</th><th class="num">Margin</th><th class="num">Alert at</th><th></th></tr></thead>
         <tbody>${lines}</tbody></table></div>` : '<div class="o-empty">No export watch yet.</div>'}
       <div class="o-note">Torn now: cheapest of the item market and bazaars (weav3r.dev). Margin total for
-        ${Fmt.count(units())} items: suitcase ${Fmt.count(suitcase())} minus ${Fmt.count(kit)} in the trip kit.
+        ${Fmt.count(units())} items: suitcase ${Fmt.count(Settings.get("capacity"))} minus ${Fmt.count(kit)} in the trip kit.
         Checked every minute while a Torn page is open.</div>
       <div class="o-group"><h4>New export watch</h4>
         <div class="o-field"><span class="o-field-label">Country</span>
