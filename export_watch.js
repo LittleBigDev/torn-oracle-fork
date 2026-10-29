@@ -29,7 +29,9 @@ const ExportWatch = (() => {
       onload: (res) => {
         try {
           const l = (JSON.parse(res.responseText).listings || [])[0];
-          resolve(l ? { price: l.price, qty: l.quantity, where: "Bazaar" } : null);
+          // tt-item-id : TornTools surligne l'objet dans le bazaar
+          resolve(l ? { price: l.price, qty: l.quantity, where: "Bazaar",
+                        url: "https://www.torn.com/bazaar.php?userId=" + l.player_id + "&tt-item-id=" + id } : null);
         } catch (e) { resolve(null); }
       },
       onerror: () => resolve(null),
@@ -52,7 +54,9 @@ const ExportWatch = (() => {
       .find((s) => s.country === Data.name(w.code));
     const pays = Math.round(it.cost * (sold && /black market/i.test(sold.shop) ? 1 : 0.75));
     const l = (((im || {}).itemmarket || {}).listings || [])[0];
-    const offers = [l && { price: l.price, qty: l.amount, where: "Item market" }, bz].filter(Boolean);
+    const offers = [l && { price: l.price, qty: l.amount, where: "Item market",
+                           url: "https://www.torn.com/page.php?sid=ItemMarket#/market/view=search&itemID=" + w.id },
+                    bz].filter(Boolean);
     if (!offers.length) return { error: "No " + w.name + " for sale in Torn." };
     const best = offers.reduce((a, b) => (b.price < a.price ? b : a));
     return Object.assign(best, { pays, margin: pays - best.price });
@@ -114,7 +118,7 @@ const ExportWatch = (() => {
       if (s.notified[keyOf(w)] === r.price) continue;
       s.notified[keyOf(w)] = r.price;
       changed = true;
-      Env.toast("Export deal", line(w, r, n));
+      Env.toast("Export deal", line(w, r, n), () => { location.href = r.url; });
       beep();
     }
     for (const k of Object.keys(s.notified)) {
@@ -122,17 +126,20 @@ const ExportWatch = (() => {
     }
     if (changed) Env.write(SHARED, s);
 
+    // Une seule offre dans le bandeau : celle qui rapporte le plus sur un voyage
+    const total = ([, r]) => r.margin * Math.min(n, r.qty);
     const shown = live.map((w) => [w, s.rows[keyOf(w)]])
-      .concat(list().filter((w) => tests[keyOf(w)]).map((w) => [w, tests[keyOf(w)]]));
+      .concat(list().filter((w) => tests[keyOf(w)]).map((w) => [w, tests[keyOf(w)]]))
+      .sort((a, b) => total(b) - total(a)).slice(0, 1);
     let bar = document.getElementById(BAR_ID);
     if (!shown.length) { if (bar) bar.remove(); }
     else {
       if (!bar) {
         bar = document.createElement("div");
         bar.id = BAR_ID;
-        bar.style.cssText = "position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2147483647;"
-          + "max-width:min(96vw,720px);padding:8px 36px 8px 12px;background:#b71c1c;color:#fff;"
-          + "font:bold 13px/1.4 Arial,sans-serif;border-radius:0 0 6px 6px;box-shadow:0 2px 8px #0008";
+        bar.style.cssText = "position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2147483647;"
+          + "max-width:min(96vw,720px);padding:8px 36px 8px 12px;color:#fff;"
+          + "font:bold 13px/1.4 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;border-radius:8px;box-shadow:0 2px 8px #0008";
         bar.addEventListener("click", (ev) => {
           if (!ev.target.matches("[data-close]")) return;
           const now = shared();
@@ -143,7 +150,10 @@ const ExportWatch = (() => {
         });
         document.body.appendChild(bar);
       }
-      bar.innerHTML = shown.map(([w, r]) => `<div>${Fmt.esc(line(w, r, n))}</div>`).join("")
+      // Même couleur que le bouton d'Oracle (med out, achat, retour)
+      bar.style.background = Page.darkMode() ? "#2dd4bf" : "#0d9488";
+      bar.innerHTML = shown.map(([w, r]) => `<div>${Fmt.esc(line(w, r, n))}
+        <a href="${Fmt.esc(r.url)}" style="color:#fff;text-decoration:underline;margin-left:6px">Buy</a></div>`).join("")
         + '<button type="button" data-close title="Hide until the price changes" style="position:absolute;'
         + 'top:4px;right:6px;background:none;border:0;color:#fff;font-size:18px;cursor:pointer">&times;</button>';
     }
@@ -227,8 +237,9 @@ const ExportWatch = (() => {
         const real = rows[keyOf(w)];
         // Relevé réel s'il existe, marge forcée au seuil ; sinon des prix inventés
         const price = real && !real.error ? real.price : 50_000;
-        tests[keyOf(w)] = { price, where: real && real.where || "Bazaar", qty: real && real.qty || 100,
-                            pays: price + w.min, margin: w.min };
+        tests[keyOf(w)] = { price, where: real && real.where || "Item market", qty: real && real.qty || 100,
+                            pays: price + w.min, margin: w.min, url: real && real.url
+                            || "https://www.torn.com/page.php?sid=ItemMarket#/market/view=search&itemID=" + w.id };
         Env.toast("Export deal (test)", line(w, tests[keyOf(w)], units()));
         beep();
         paint();
