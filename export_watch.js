@@ -9,18 +9,24 @@ const ExportWatch = (() => {
   const BAR_ID = "oracle-fork-export";
 
   let shopItems = {};
-  // Temporaire : déclenchements simulés (bouton Test), affichés jusqu'à la croix du bandeau
-  let tests = {};
 
   const list = () => Env.read(WATCHES, []);
   const shared = () => Env.read(SHARED, { at: 0, rows: {}, notified: {}, dismissed: {} });
   const keyOf = (w) => w.id + "|" + w.code;
 
+  // « Suitcase size » suit les places libres de l'agence quand la valise est déjà chargée :
+  // on garde le plus grand vu, c'est-à-dire la valise vide
+  function suitcase() {
+    const size = Math.max(Env.read("fork_suitcase", 0), Settings.get("capacity") || 0);
+    if (size !== Env.read("fork_suitcase", 0)) Env.write("fork_suitcase", size);
+    return size;
+  }
+
   function units() {
     const kit = Settings.get("assist_kit") || {};
     const packed = (kit.hosp ? 1 : 0) + (kit.med ? kit.meds || 0 : 0)
       + (kit.extras || []).reduce((s, e) => s + (e.n || 0), 0);
-    return Math.max(0, (Settings.get("capacity") || 0) - packed);
+    return Math.max(0, suitcase() - packed);
   }
 
   function bazaar(id) {
@@ -103,9 +109,9 @@ const ExportWatch = (() => {
   }
 
   function line(w, r, n) {
-    return `${w.name}: ${Fmt.price(r.price)} (${r.where}, ${Fmt.count(r.qty)} for sale), `
-      + `${Data.name(w.code)} pays ${Fmt.price(r.pays)}. +${Fmt.price(r.margin)} each, `
-      + `${Fmt.money(r.margin * Math.min(n, r.qty))} for ${Fmt.count(Math.min(n, r.qty))}`;
+    return `${w.name}: ${Fmt.price(r.price)} (${r.where}, ${Fmt.count(r.qty)} for sale). `
+      + `+${Fmt.price(r.margin)} each in ${Data.name(w.code)}, `
+      + `${Fmt.money(r.margin * Math.min(n, r.qty))} for ${Fmt.count(Math.min(n, r.qty))}.`;
   }
 
   function paint() {
@@ -129,7 +135,6 @@ const ExportWatch = (() => {
     // Une seule offre dans le bandeau : celle qui rapporte le plus sur un voyage
     const total = ([, r]) => r.margin * Math.min(n, r.qty);
     const shown = live.map((w) => [w, s.rows[keyOf(w)]])
-      .concat(list().filter((w) => tests[keyOf(w)]).map((w) => [w, tests[keyOf(w)]]))
       .sort((a, b) => total(b) - total(a)).slice(0, 1);
     let bar = document.getElementById(BAR_ID);
     if (!shown.length) { if (bar) bar.remove(); }
@@ -143,7 +148,6 @@ const ExportWatch = (() => {
           const now = shared();
           for (const w of hits()) now.dismissed[keyOf(w)] = now.rows[keyOf(w)].price;
           Env.write(SHARED, now);
-          tests = {};
           paint();
         });
       }
@@ -165,7 +169,7 @@ const ExportWatch = (() => {
       bar.innerHTML = `<div class="oa-line"><span class="oa-brand">Torn Oracle</span>
           <span class="oa-note">Export deal</span>
           <button type="button" class="oa-x" data-close title="Hide until the price changes">&times;</button></div>
-        <a class="oa-go" href="${Fmt.esc(r.url)}">${Fmt.esc(line(w, r, n))}. Buy</a>`;
+        <a class="oa-go" href="${Fmt.esc(r.url)}">${Fmt.esc(line(w, r, n))}</a>`;
     }
     Panel.refresh("exportwatch");
   }
@@ -218,7 +222,7 @@ const ExportWatch = (() => {
     }
     loadShop(form.code);
     const rows = shared().rows;
-    const kit = Settings.get("capacity") - units();
+    const kit = suitcase() - units();
     const lines = list().map((w) => {
       const r = rows[keyOf(w)];
       const cells = !r ? '<td colspan="3" class="muted">Waiting…</td>'
@@ -229,8 +233,7 @@ const ExportWatch = (() => {
              Fmt.esc(Fmt.price(r.margin))}</span><span class="o-sub">${Fmt.esc(Fmt.money(r.margin * units()))}</span></td>`;
       return `<tr><td>${Fmt.esc(w.name)}<span class="o-sub">${Fmt.esc(Data.name(w.code))}</span></td>${cells}
         <td class="num">${Fmt.esc(Fmt.price(w.min))}</td>
-        <td><button type="button" class="o-link" data-test="${Fmt.esc(keyOf(w))}" title="Simulate an alert">Test</button>
-          <button type="button" class="o-link" data-del="${Fmt.esc(keyOf(w))}" title="Stop watching">&times;</button></td></tr>`;
+        <td><button type="button" class="o-link" data-del="${Fmt.esc(keyOf(w))}" title="Stop watching">&times;</button></td></tr>`;
     }).join("");
     const items = shopItems[form.code] || [];
     el.innerHTML = `
@@ -238,7 +241,7 @@ const ExportWatch = (() => {
         <th class="num">Shop pays</th><th class="num">Margin</th><th class="num">Alert at</th><th></th></tr></thead>
         <tbody>${lines}</tbody></table></div>` : '<div class="o-empty">No export watch yet.</div>'}
       <div class="o-note">Torn now: cheapest of the item market and bazaars (weav3r.dev). Margin total for
-        ${Fmt.count(units())} items: suitcase ${Fmt.count(Settings.get("capacity"))} minus ${Fmt.count(kit)} in the trip kit.
+        ${Fmt.count(units())} items: suitcase ${Fmt.count(suitcase())} minus ${Fmt.count(kit)} in the trip kit.
         Checked every minute while a Torn page is open.</div>
       <div class="o-group"><h4>New export watch</h4>
         <div class="o-field"><span class="o-field-label">Country</span>
@@ -262,21 +265,6 @@ const ExportWatch = (() => {
       Env.write(WATCHES, list().filter((x) => keyOf(x) !== keyOf(w)).concat(w));
       poll(true);
     });
-    for (const b of el.querySelectorAll("[data-test]")) {
-      b.addEventListener("click", () => {
-        const w = list().find((x) => keyOf(x) === b.dataset.test);
-        if (!w) return;
-        const real = rows[keyOf(w)];
-        // Relevé réel s'il existe, marge forcée au seuil ; sinon des prix inventés
-        const price = real && !real.error ? real.price : 50_000;
-        tests[keyOf(w)] = { price, where: real && real.where || "Item market", qty: real && real.qty || 100,
-                            pays: price + w.min, margin: w.min, url: real && real.url
-                            || "https://www.torn.com/page.php?sid=ItemMarket#/market/view=search&itemID=" + w.id };
-        Env.toast("Export deal (test)", line(w, tests[keyOf(w)], units()));
-        beep();
-        paint();
-      });
-    }
     for (const b of el.querySelectorAll("[data-del]")) {
       b.addEventListener("click", () => {
         Env.write(WATCHES, list().filter((x) => keyOf(x) !== b.dataset.del));
