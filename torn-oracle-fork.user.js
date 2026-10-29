@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.5-fork.3
+// @version      2.6.5-fork.4
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.5 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -8960,9 +8960,10 @@ const ExportWatch = (() => {
       if (!bar) {
         bar = document.createElement("div");
         bar.id = BAR_ID;
-        bar.style.cssText = "position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2147483647;"
-          + "max-width:min(96vw,720px);padding:8px 36px 8px 12px;color:#fff;"
-          + "font:bold 13px/1.4 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;border-radius:8px;box-shadow:0 2px 8px #0008";
+        // Même gabarit que le bouton d'Oracle : en haut du contenu, collant au défilement
+        bar.style.cssText = "position:sticky;top:0;z-index:50;box-sizing:border-box;width:100%;margin:0 0 8px;"
+          + "padding:8px 36px 8px 10px;color:#10161c;border-radius:10px;"
+          + "font:bold 13px/1.4 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
         bar.addEventListener("click", (ev) => {
           if (!ev.target.matches("[data-close]")) return;
           const now = shared();
@@ -8971,14 +8972,21 @@ const ExportWatch = (() => {
           tests = {};
           paint();
         });
-        document.body.appendChild(bar);
       }
+      // Au-dessus du bouton d'Oracle en voyage, sinon en tête du contenu ; replacé si Torn redessine la page
+      const anchor = document.getElementById("oracle-assist") || document.getElementById("travel-root");
+      const wrap = document.querySelector(".content-wrapper");
+      if (anchor && anchor.parentNode) {
+        if (bar.nextSibling !== anchor) anchor.parentNode.insertBefore(bar, anchor);
+      } else if (wrap) {
+        if (wrap.firstChild !== bar) wrap.insertBefore(bar, wrap.firstChild);
+      } else if (!bar.isConnected) document.body.prepend(bar);
       // Même couleur que le bouton d'Oracle (med out, achat, retour)
       bar.style.background = Page.darkMode() ? "#2dd4bf" : "#0d9488";
       bar.innerHTML = shown.map(([w, r]) => `<div>${Fmt.esc(line(w, r, n))}
-        <a href="${Fmt.esc(r.url)}" style="color:#fff;text-decoration:underline;margin-left:6px">Buy</a></div>`).join("")
+        <a href="${Fmt.esc(r.url)}" style="color:inherit;text-decoration:underline;margin-left:6px">Buy</a></div>`).join("")
         + '<button type="button" data-close title="Hide until the price changes" style="position:absolute;'
-        + 'top:4px;right:6px;background:none;border:0;color:#fff;font-size:18px;cursor:pointer">&times;</button>';
+        + 'top:4px;right:6px;background:none;border:0;color:inherit;font-size:18px;cursor:pointer">&times;</button>';
     }
     Panel.refresh("exportwatch");
   }
