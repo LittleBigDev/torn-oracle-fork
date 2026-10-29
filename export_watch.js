@@ -14,12 +14,12 @@ const ExportWatch = (() => {
   const shared = () => Env.read(SHARED, { at: 0, rows: {}, notified: {}, dismissed: {} });
   const keyOf = (w) => w.id + "|" + w.code;
 
-  // « Suitcase size » suit les places libres de l'agence quand la valise est déjà chargée :
-  // on garde le plus grand vu, c'est-à-dire la valise vide
+  // « Suitcase size » suit les places libres de l'agence, pas la taille de la valise : on retient le
+  // nombre de cases de la valise affichée par l'agence (vide ou pleine)
   function suitcase() {
-    const size = Math.max(Env.read("fork_suitcase", 0), Settings.get("capacity") || 0);
-    if (size !== Env.read("fork_suitcase", 0)) Env.write("fork_suitcase", size);
-    return size;
+    const inv = Page.travelInventory();
+    if (inv && inv.slots !== Env.read("fork_suitcase", 0)) Env.write("fork_suitcase", inv.slots);
+    return Env.read("fork_suitcase", 0) || Settings.get("capacity") || 0;
   }
 
   function units() {
