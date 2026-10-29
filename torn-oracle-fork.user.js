@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.5-fork.1
+// @version      2.6.5-fork.2
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.5 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville).
+// @description  Fork de Torn Oracle: Travel 2.6.5 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
-// @match        https://www.torn.com/page.php?sid=travel*
+// @match        https://www.torn.com/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
@@ -17,6 +17,7 @@
 // @grant        GM_addStyle
 // @connect      api.torn.com
 // @connect      torn-oracle.duckdns.org
+// @connect      weav3r.dev
 // @run-at       document-idle
 // @noframes
 // ==/UserScript==
@@ -278,8 +279,8 @@ const Data = (() => {
   }
 
   // Fork : taux des traders Wardogs par objet (généré par maj.py), sinon item market (85 %)
-  const TAUX_TRADERS = {"African Violet": 0.98, "Aluminum Plate": 0.9, "Banana Orchid": 0.98, "Basalt Point": 0.9, "Bolt Cutters": 0.9, "Bonded Latex": 0.9, "Bottle of Sake": 0.95, "Bottle of Tequila": 0.95, "Camel Plushie": 0.98, "Cannabis": 0.95, "Card Skimmer": 0.9, "Ceibo Flower": 0.98, "Chalcedony Point": 0.9, "Chamois Plushie": 0.98, "Cherry Blossom": 0.98, "Chert Point": 0.9, "Claymore Mine": 0.95, "Crocus": 0.98, "Dahlia": 0.98, "Dog Treats": 0.9, "Dozen White Roses": 0.98, "Ecstasy": 0.95, "Edelweiss": 0.98, "Fireworks": 0.95, "Flash Grenade": 0.95, "Glow Stick": 0.9, "Gold Laptop": 0.9, "Grenade": 0.95, "HEG": 0.95, "Heather": 0.98, "Hydrochloric Acid": 0.9, "Inkwell": 0.9, "Jaguar Plushie": 0.98, "Ketamine": 0.95, "LSD": 0.95, "Large Suitcase": 0.9, "Lighter": 0.9, "Lion Plushie": 0.98, "Magnesium Shavings": 0.9, "Medium Suitcase": 0.9, "Meteorite Fragment": 0.9, "Monkey Plushie": 0.98, "Nessie Plushie": 0.98, "Neumune Tablet": 0.9, "Ninja Star": 0.95, "Obsidian Point": 0.9, "Opium": 0.95, "Orchid": 0.98, "PCP": 0.95, "PVC Cards": 0.9, "Panda Plushie": 0.98, "Patagonian Fossil": 0.9, "Peony": 0.98, "Potassium Nitrate": 0.9, "Printing Paper": 0.9, "Quartz Point": 0.9, "Quartzite Point": 0.9, "Red Fox Plushie": 0.98, "Shrooms": 0.95, "Small Suitcase": 0.9, "Smoke Grenade": 0.95, "Speed": 0.95, "Sports Sneakers": 0.9, "Stick Grenade": 0.95, "Stick of Dynamite": 0.9, "Stingray Plushie": 0.98, "Tear Gas": 0.95, "Throwing Knife": 0.95, "Tribulus Omanense": 0.98, "Trout": 0.95, "Vicodin": 0.95, "Wolverine Plushie": 0.98, "Xanax": 0.95, "Zip Ties": 0.9};
-  const BOUTIQUES = {"9mm Uzi": "Big Al's Gun Shop", "AK-47": "Big Al's Gun Shop", "African Violet": "Bits 'n' Bobs", "Afro Comb": "Recycling Center", "Ambergris Lump": "Jewelry Store", "ArmaLite M-15A4": "Big Al's Gun Shop", "Axe": "Big Al's Gun Shop", "BT MP9": "Big Al's Gun Shop", "Banana Orchid": "Bits 'n' Bobs", "Bear Gall": "Nikeh Sports", "Bearer Bond": "Pawn Shop", "Bikini": "TC Clothing", "Blowgun": "Big Al's Gun Shop", "Bo Staff": "Big Al's Gun Shop", "Bottle of Sake": "Bits 'n' Bobs", "Bottle of Tequila": "Bits 'n' Bobs", "Bushmaster Carbon 15": "Big Al's Gun Shop", "Camel Plushie": "Bits 'n' Bobs", "Ceibo Flower": "Bits 'n' Bobs", "Chain Whip": "Big Al's Gun Shop", "Chamois Plushie": "Bits 'n' Bobs", "Cherry Blossom": "Bits 'n' Bobs", "Chopsticks": "Bits 'n' Bobs", "Claymore Mine": "Big Al's Gun Shop", "Claymore Sword": "Big Al's Gun Shop", "Cobra Derringer": "Big Al's Gun Shop", "Coconut Bra": "TC Clothing", "Combat Boots": "Big Al's Gun Shop", "Combat Gloves": "Big Al's Gun Shop", "Combat Helmet": "Big Al's Gun Shop", "Combat Pants": "Big Al's Gun Shop", "Combat Vest": "Big Al's Gun Shop", "Compass": "Bits 'n' Bobs", "Counterfeit Manga": "Pawn Shop", "Crazy Straw": "Recycling Center", "Cricket Bat": "Big Al's Gun Shop", "Crocus": "Bits 'n' Bobs", "Crossbow": "Big Al's Gun Shop", "Dahlia": "Bits 'n' Bobs", "Dart Board": "Recycling Center", "Desert Eagle": "Big Al's Gun Shop", "Diamond Bladed Knife": "Big Al's Gun Shop", "Diving Gloves": "TC Clothing", "Edelweiss": "Bits 'n' Bobs", "Elephant Statue": "Bits 'n' Bobs", "Enfield SA-80": "Big Al's Gun Shop", "Ephedrine Powder": "Pharmacy", "Ergotamine Ampoule": "Pharmacy", "Fire Hydrant": "Recycling Center", "Fireworks": "Big Al's Gun Shop", "Flail": "Big Al's Gun Shop", "Flak Jacket": "Big Al's Gun Shop", "Flamethrower": "Big Al's Gun Shop", "Flare Gun": "Big Al's Gun Shop", "Flash Grenade": "Big Al's Gun Shop", "Flexible Body Armor": "Big Al's Gun Shop", "Flippers": "TC Clothing", "Frying Pan": "Big Al's Gun Shop", "Grenade": "Big Al's Gun Shop", "Guandao": "Big Al's Gun Shop", "HEG": "Big Al's Gun Shop", "Harpoon": "Big Al's Gun Shop", "Heather": "Bits 'n' Bobs", "Heckler & Koch SL8": "Big Al's Gun Shop", "Hockey Stick": "Bits 'n' Bobs", "Hydrochloric Acid": "Pharmacy", "Ice Pick": "Big Al's Gun Shop", "Insulin": "Pharmacy", "Ithaca 37": "Big Al's Gun Shop", "Jackhammer": "Big Al's Gun Shop", "Jade Buddha": "Recycling Center", "Jaguar Plushie": "Bits 'n' Bobs", "Kabuki Mask": "TC Clothing", "Kama": "Big Al's Gun Shop", "Katana": "Big Al's Gun Shop", "Kevlar Gloves": "Big Al's Gun Shop", "Knuckle Dusters": "Big Al's Gun Shop", "Kodachi": "Big Al's Gun Shop", "Large Suitcase": "Bits 'n' Bobs", "Leather Bullwhip": "Big Al's Gun Shop", "Lion Plushie": "Bits 'n' Bobs", "Liquid Body Armor": "Big Al's Gun Shop", "Lorcin 380": "Big Al's Gun Shop", "M249 SAW": "Big Al's Gun Shop", "Macana": "Big Al's Gun Shop", "Mag 7": "Big Al's Gun Shop", "Maneki Neko": "Recycling Center", "Mayan Statue": "Bits 'n' Bobs", "Medium Suitcase": "Bits 'n' Bobs", "Metal Nunchaku": "Big Al's Gun Shop", "Minigun": "Big Al's Gun Shop", "Model Space Ship": "Recycling Center", "Monkey Plushie": "Bits 'n' Bobs", "Mountie Hat": "TC Clothing", "Natural Pearls": "Jewelry Store", "Naval Cutlass": "Big Al's Gun Shop", "Nessie Plushie": "Bits 'n' Bobs", "Neumune Tablet": "Pharmacy", "Ninja Claws": "Big Al's Gun Shop", "Ninja Star": "Big Al's Gun Shop", "Nodding Turtle": "Recycling Center", "Orchid": "Bits 'n' Bobs", "Outer Tactical Vest": "Big Al's Gun Shop", "Panda Plushie": "Bits 'n' Bobs", "Pangolin Scales": "Nikeh Sports", "Paper Weight": "Bits 'n' Bobs", "Pele Charm": "Bits 'n' Bobs", "Peony": "Bits 'n' Bobs", "Proda Sunglasses": "TC Clothing", "Qsz-92": "Big Al's Gun Shop", "Raw Ivory": "Pawn Shop", "Red Fox Plushie": "Bits 'n' Bobs", "SIG 552": "Big Al's Gun Shop", "SKS Carbine": "Big Al's Gun Shop", "Safety Boots": "Big Al's Gun Shop", "Safrole Oil": "Pharmacy", "Sai": "Big Al's Gun Shop", "Samurai Sword": "Big Al's Gun Shop", "Sensu": "Bits 'n' Bobs", "Sextant": "Recycling Center", "Shark Fin": "Nikeh Sports", "Ship in a Bottle": "Recycling Center", "Small Suitcase": "Bits 'n' Bobs", "Smoke Grenade": "Big Al's Gun Shop", "Snorkel": "TC Clothing", "Snowboard": "Recycling Center", "Soccer Ball": "Bits 'n' Bobs", "Spear": "Big Al's Gun Shop", "Speedo": "TC Clothing", "Sports Shades": "TC Clothing", "Springfield 1911": "Big Al's Gun Shop", "Steel Drum": "Recycling Center", "Stick Grenade": "Big Al's Gun Shop", "Stingray Plushie": "Bits 'n' Bobs", "Sumo Doll": "Bits 'n' Bobs", "Swiss Army Knife": "Big Al's Gun Shop", "Tailor's Dummy": "Recycling Center", "Taser": "Big Al's Gun Shop", "Taurus PT92": "Big Al's Gun Shop", "Tavor TAR-21": "Big Al's Gun Shop", "Tear Gas": "Big Al's Gun Shop", "Throwing Knife": "Big Al's Gun Shop", "Tiger Bone Powder": "Nikeh Sports", "Trench Coat": "TC Clothing", "Tribulus Omanense": "Bits 'n' Bobs", "Trout": "Big Al's Gun Shop", "Turtle Shell": "Jewelry Store", "Twin Tiger Hooks": "Big Al's Gun Shop", "Type 98 Anti Tank": "Big Al's Gun Shop", "Uncut Diamonds": "Jewelry Store", "Vektor CR-21": "Big Al's Gun Shop", "WWII Helmet": "Big Al's Gun Shop", "Wetsuit": "TC Clothing", "Whale Meat": "Nikeh Sports", "Wolverine Plushie": "Bits 'n' Bobs", "Wooden Nunchaku": "Big Al's Gun Shop", "Wushu Double Axes": "Big Al's Gun Shop", "Yakitori Lantern": "Recycling Center", "Yucca Plant": "Recycling Center"};
+  const TAUX_TRADERS = {"African Violet": 0.98, "Aluminum Plate": 0.9, "Banana Orchid": 0.98, "Basalt Point": 0.9, "Blank Casino Chips": 0.9, "Bolt Cutters": 0.9, "Bonded Latex": 0.9, "Bottle of Sake": 0.95, "Bottle of Tequila": 0.95, "Camel Plushie": 0.98, "Cannabis": 0.95, "Card Skimmer": 0.9, "Ceibo Flower": 0.98, "Chalcedony Point": 0.9, "Chamois Plushie": 0.98, "Cherry Blossom": 0.98, "Chert Point": 0.9, "Claymore Mine": 0.95, "Crocus": 0.98, "Dahlia": 0.98, "Dog Treats": 0.9, "Dozen White Roses": 0.98, "Ecstasy": 0.95, "Edelweiss": 0.98, "Fireworks": 0.95, "Flash Grenade": 0.95, "Glow Stick": 0.9, "Gold Laptop": 0.9, "Grenade": 0.95, "HEG": 0.95, "Heather": 0.98, "Hydrochloric Acid": 0.9, "Inkwell": 0.9, "Jaguar Plushie": 0.98, "Ketamine": 0.95, "LSD": 0.95, "Large Suitcase": 0.9, "Lighter": 0.9, "Lion Plushie": 0.98, "Magnesium Shavings": 0.9, "Medium Suitcase": 0.9, "Meteorite Fragment": 0.9, "Monkey Plushie": 0.98, "Nessie Plushie": 0.98, "Neumune Tablet": 0.9, "Ninja Star": 0.95, "Obsidian Point": 0.9, "Opium": 0.95, "Orchid": 0.98, "PCP": 0.95, "PVC Cards": 0.9, "Panda Plushie": 0.98, "Patagonian Fossil": 0.9, "Peony": 0.98, "Potassium Nitrate": 0.9, "Printing Paper": 0.9, "Quartz Point": 0.9, "Quartzite Point": 0.9, "Red Fox Plushie": 0.98, "Shrooms": 0.95, "Small Suitcase": 0.9, "Smoke Grenade": 0.95, "Speed": 0.95, "Sports Sneakers": 0.9, "Stick Grenade": 0.95, "Stick of Dynamite": 0.9, "Stingray Plushie": 0.98, "Tear Gas": 0.95, "Throwing Knife": 0.95, "Tribulus Omanense": 0.98, "Trout": 0.95, "Vicodin": 0.95, "Wolverine Plushie": 0.98, "Xanax": 0.95, "Zip Ties": 0.9};
+  const BOUTIQUES = {"9mm Uzi": "Big Al's Gun Shop", "AK-47": "Big Al's Gun Shop", "African Violet": "Bits 'n' Bobs", "Afro Comb": "Recycling Center", "Ambergris Lump": "Jewelry Store", "ArmaLite M-15A4": "Big Al's Gun Shop", "Axe": "Big Al's Gun Shop", "BT MP9": "Big Al's Gun Shop", "Banana Orchid": "Bits 'n' Bobs", "Bear Gall": "Nikeh Sports", "Bearer Bond": "Pawn Shop", "Bikini": "TC Clothing", "Blowgun": "Big Al's Gun Shop", "Bo Staff": "Big Al's Gun Shop", "Bottle of Sake": "Bits 'n' Bobs", "Bottle of Tequila": "Bits 'n' Bobs", "Bushmaster Carbon 15": "Big Al's Gun Shop", "Camel Plushie": "Bits 'n' Bobs", "Ceibo Flower": "Bits 'n' Bobs", "Chain Whip": "Big Al's Gun Shop", "Chamois Plushie": "Bits 'n' Bobs", "Cherry Blossom": "Bits 'n' Bobs", "Chopsticks": "Bits 'n' Bobs", "Claymore Mine": "Big Al's Gun Shop", "Claymore Sword": "Big Al's Gun Shop", "Cobra Derringer": "Big Al's Gun Shop", "Coconut Bra": "TC Clothing", "Combat Boots": "Big Al's Gun Shop", "Combat Gloves": "Big Al's Gun Shop", "Combat Helmet": "Big Al's Gun Shop", "Combat Pants": "Big Al's Gun Shop", "Combat Vest": "Big Al's Gun Shop", "Compass": "Bits 'n' Bobs", "Construction Helmet": "Big Al's Gun Shop", "Counterfeit Manga": "Pawn Shop", "Crazy Straw": "Recycling Center", "Cricket Bat": "Big Al's Gun Shop", "Crocus": "Bits 'n' Bobs", "Crossbow": "Big Al's Gun Shop", "Dahlia": "Bits 'n' Bobs", "Dart Board": "Recycling Center", "Desert Eagle": "Big Al's Gun Shop", "Diamond Bladed Knife": "Big Al's Gun Shop", "Diving Gloves": "TC Clothing", "Edelweiss": "Bits 'n' Bobs", "Elephant Statue": "Bits 'n' Bobs", "Enfield SA-80": "Big Al's Gun Shop", "Ephedrine Powder": "Pharmacy", "Ergotamine Ampoule": "Pharmacy", "Fire Hydrant": "Recycling Center", "Fireworks": "Big Al's Gun Shop", "Flail": "Big Al's Gun Shop", "Flak Jacket": "Big Al's Gun Shop", "Flamethrower": "Big Al's Gun Shop", "Flare Gun": "Big Al's Gun Shop", "Flash Grenade": "Big Al's Gun Shop", "Flexible Body Armor": "Big Al's Gun Shop", "Flippers": "TC Clothing", "Frying Pan": "Big Al's Gun Shop", "Grenade": "Big Al's Gun Shop", "Guandao": "Big Al's Gun Shop", "HEG": "Big Al's Gun Shop", "Harpoon": "Big Al's Gun Shop", "Heather": "Bits 'n' Bobs", "Heckler & Koch SL8": "Big Al's Gun Shop", "Hockey Stick": "Bits 'n' Bobs", "Hydrochloric Acid": "Pharmacy", "Ice Pick": "Big Al's Gun Shop", "Insulin": "Pharmacy", "Ithaca 37": "Big Al's Gun Shop", "Jackhammer": "Big Al's Gun Shop", "Jade Buddha": "Recycling Center", "Jaguar Plushie": "Bits 'n' Bobs", "Kabuki Mask": "TC Clothing", "Kama": "Big Al's Gun Shop", "Katana": "Big Al's Gun Shop", "Kevlar Gloves": "Big Al's Gun Shop", "Knuckle Dusters": "Big Al's Gun Shop", "Kodachi": "Big Al's Gun Shop", "Large Suitcase": "Bits 'n' Bobs", "Leather Bullwhip": "Big Al's Gun Shop", "Lion Plushie": "Bits 'n' Bobs", "Liquid Body Armor": "Big Al's Gun Shop", "Lorcin 380": "Big Al's Gun Shop", "M249 SAW": "Big Al's Gun Shop", "Macana": "Big Al's Gun Shop", "Mag 7": "Big Al's Gun Shop", "Maneki Neko": "Recycling Center", "Mayan Statue": "Bits 'n' Bobs", "Medium Suitcase": "Bits 'n' Bobs", "Metal Nunchaku": "Big Al's Gun Shop", "Minigun": "Big Al's Gun Shop", "Model Space Ship": "Recycling Center", "Monkey Plushie": "Bits 'n' Bobs", "Mountie Hat": "TC Clothing", "Natural Pearls": "Jewelry Store", "Naval Cutlass": "Big Al's Gun Shop", "Nessie Plushie": "Bits 'n' Bobs", "Neumune Tablet": "Pharmacy", "Ninja Claws": "Big Al's Gun Shop", "Ninja Star": "Big Al's Gun Shop", "Nodding Turtle": "Recycling Center", "Orchid": "Bits 'n' Bobs", "Outer Tactical Vest": "Big Al's Gun Shop", "Panda Plushie": "Bits 'n' Bobs", "Pangolin Scales": "Nikeh Sports", "Paper Weight": "Bits 'n' Bobs", "Pele Charm": "Bits 'n' Bobs", "Peony": "Bits 'n' Bobs", "Proda Sunglasses": "TC Clothing", "Qsz-92": "Big Al's Gun Shop", "Raw Ivory": "Pawn Shop", "Red Fox Plushie": "Bits 'n' Bobs", "SIG 552": "Big Al's Gun Shop", "SKS Carbine": "Big Al's Gun Shop", "Safety Boots": "Big Al's Gun Shop", "Safrole Oil": "Pharmacy", "Sai": "Big Al's Gun Shop", "Samurai Sword": "Big Al's Gun Shop", "Sensu": "Bits 'n' Bobs", "Sextant": "Recycling Center", "Shark Fin": "Nikeh Sports", "Ship in a Bottle": "Recycling Center", "Small Suitcase": "Bits 'n' Bobs", "Smoke Grenade": "Big Al's Gun Shop", "Snorkel": "TC Clothing", "Snowboard": "Recycling Center", "Soccer Ball": "Bits 'n' Bobs", "Spear": "Big Al's Gun Shop", "Speedo": "TC Clothing", "Sports Shades": "TC Clothing", "Springfield 1911": "Big Al's Gun Shop", "Steel Drum": "Recycling Center", "Stick Grenade": "Big Al's Gun Shop", "Stingray Plushie": "Bits 'n' Bobs", "Sumo Doll": "Bits 'n' Bobs", "Swiss Army Knife": "Big Al's Gun Shop", "Tailor's Dummy": "Recycling Center", "Taser": "Big Al's Gun Shop", "Taurus PT92": "Big Al's Gun Shop", "Tavor TAR-21": "Big Al's Gun Shop", "Tear Gas": "Big Al's Gun Shop", "Throwing Knife": "Big Al's Gun Shop", "Tiger Bone Powder": "Nikeh Sports", "Trench Coat": "TC Clothing", "Tribulus Omanense": "Bits 'n' Bobs", "Trout": "Big Al's Gun Shop", "Turtle Shell": "Jewelry Store", "Twin Tiger Hooks": "Big Al's Gun Shop", "Type 98 Anti Tank": "Big Al's Gun Shop", "Uncut Diamonds": "Jewelry Store", "Vektor CR-21": "Big Al's Gun Shop", "WWII Helmet": "Big Al's Gun Shop", "Wetsuit": "TC Clothing", "Whale Meat": "Nikeh Sports", "Wolverine Plushie": "Bits 'n' Bobs", "Wooden Nunchaku": "Big Al's Gun Shop", "Wushu Double Axes": "Big Al's Gun Shop", "Yakitori Lantern": "Recycling Center", "Yucca Plant": "Recycling Center"};
 
   function unitSell(marketValue, sellPrice, sellTo, name) {
     const best = Math.max((marketValue || 0) * Math.max(TAUX_TRADERS[name] || 0, 0.85), sellPrice || 0);
@@ -8820,10 +8821,243 @@ const ViewNews = (() => {
   return { id: "news", label: "News", render, badge: () => News.unread().length };
 })();
 
+// Fork : alerte d'export. Prix le plus bas à Torn (item market et bazaars) comparé au prix de rachat
+// en direct d'une boutique étrangère ; bandeau sur toutes les pages, notification et bip au-dessus de la marge choisie.
+const ExportWatch = (() => {
+  "use strict";
+
+  const WATCHES = "fork_export_watch";
+  const SHARED = "fork_export_state";
+  const POLL_MS = 60_000;
+  const BAR_ID = "oracle-fork-export";
+
+  let shopItems = {};
+
+  const list = () => Env.read(WATCHES, []);
+  const shared = () => Env.read(SHARED, { at: 0, rows: {}, notified: {}, dismissed: {} });
+  const keyOf = (w) => w.id + "|" + w.code;
+
+  function units() {
+    const kit = Settings.get("assist_kit") || {};
+    const packed = (kit.hosp ? 1 : 0) + (kit.med ? kit.meds || 0 : 0)
+      + (kit.extras || []).reduce((s, e) => s + (e.n || 0), 0);
+    return Math.max(0, (Settings.get("capacity") || 0) - packed);
+  }
+
+  function bazaar(id) {
+    return new Promise((resolve) => Env.net({
+      method: "GET", url: "https://weav3r.dev/api/marketplace/" + id, timeout: 20_000,
+      onload: (res) => {
+        try {
+          const l = (JSON.parse(res.responseText).listings || [])[0];
+          resolve(l ? { price: l.price, qty: l.quantity, where: "Bazaar" } : null);
+        } catch (e) { resolve(null); }
+      },
+      onerror: () => resolve(null),
+      ontimeout: () => resolve(null),
+    }));
+  }
+
+  async function row(w, shops) {
+    shops[w.code] = shops[w.code] || Oracle.shop(w.code);
+    const [shop, im, bz, meta] = await Promise.all([
+      shops[w.code],
+      Torn.get("market/" + w.id + "/itemmarket", { params: { limit: 1 } }),
+      bazaar(w.id),
+      Torn.get("torn/" + w.id + "/items", { ttl: 3_600_000 }),
+    ]);
+    const it = (shop.items || []).find((i) => Number(i.item_id) === w.id);
+    if (!it) return { error: w.name + " is not sold in " + Data.name(w.code) + "." };
+    // Un Black Market rachète à son prix du moment, les autres boutiques à 75 % (note de l'onglet Exports)
+    const sold = ((((meta.items || [])[0] || {}).value || {}).shops || [])
+      .find((s) => s.country === Data.name(w.code));
+    const pays = Math.round(it.cost * (sold && /black market/i.test(sold.shop) ? 1 : 0.75));
+    const l = (((im || {}).itemmarket || {}).listings || [])[0];
+    const offers = [l && { price: l.price, qty: l.amount, where: "Item market" }, bz].filter(Boolean);
+    if (!offers.length) return { error: "No " + w.name + " for sale in Torn." };
+    const best = offers.reduce((a, b) => (b.price < a.price ? b : a));
+    return Object.assign(best, { pays, margin: pays - best.price });
+  }
+
+  async function poll(force) {
+    const watches = list();
+    const s = shared();
+    if (!watches.length || !Torn.haveKey() || !Oracle.haveToken()) return paint();
+    // Un seul onglet interroge les API par minute ; les autres lisent le résultat partagé
+    if (!force && Date.now() - s.at < POLL_MS - 5_000) return paint();
+    s.at = Date.now();
+    Env.write(SHARED, s);
+    const shops = {};
+    const rows = {};
+    for (const w of watches) {
+      try { rows[keyOf(w)] = await row(w, shops); }
+      catch (err) { rows[keyOf(w)] = { error: err.message }; }
+    }
+    Env.write(SHARED, Object.assign(shared(), { at: Date.now(), rows }));
+    paint();
+  }
+
+  function hits() {
+    const rows = shared().rows;
+    return list().filter((w) => { const r = rows[keyOf(w)]; return r && !r.error && r.margin >= w.min; });
+  }
+
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.25, 0.5].forEach((at) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 988;
+        gain.gain.value = 0.2;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + at);
+        osc.stop(ctx.currentTime + at + 0.15);
+      });
+      setTimeout(() => ctx.close(), 1500);
+    } catch (e) {  }
+  }
+
+  function line(w, r, n) {
+    return `${w.name}: ${Fmt.price(r.price)} (${r.where}, ${Fmt.count(r.qty)} for sale), `
+      + `${Data.name(w.code)} pays ${Fmt.price(r.pays)}. +${Fmt.price(r.margin)} each, `
+      + `${Fmt.money(r.margin * Math.min(n, r.qty))} for ${Fmt.count(Math.min(n, r.qty))}`;
+  }
+
+  function paint() {
+    const s = shared();
+    const n = units();
+    const live = hits().filter((w) => s.dismissed[keyOf(w)] !== s.rows[keyOf(w)].price);
+    let changed = false;
+    for (const w of live) {
+      const r = s.rows[keyOf(w)];
+      if (s.notified[keyOf(w)] === r.price) continue;
+      s.notified[keyOf(w)] = r.price;
+      changed = true;
+      Env.toast("Export deal", line(w, r, n));
+      beep();
+    }
+    for (const k of Object.keys(s.notified)) {
+      if (!live.some((w) => keyOf(w) === k)) { delete s.notified[k]; changed = true; }
+    }
+    if (changed) Env.write(SHARED, s);
+
+    let bar = document.getElementById(BAR_ID);
+    if (!live.length) { if (bar) bar.remove(); }
+    else {
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.id = BAR_ID;
+        bar.style.cssText = "position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2147483647;"
+          + "max-width:min(96vw,720px);padding:8px 36px 8px 12px;background:#b71c1c;color:#fff;"
+          + "font:bold 13px/1.4 Arial,sans-serif;border-radius:0 0 6px 6px;box-shadow:0 2px 8px #0008";
+        bar.addEventListener("click", (ev) => {
+          if (!ev.target.matches("[data-close]")) return;
+          const now = shared();
+          for (const w of hits()) now.dismissed[keyOf(w)] = now.rows[keyOf(w)].price;
+          Env.write(SHARED, now);
+          paint();
+        });
+        document.body.appendChild(bar);
+      }
+      bar.innerHTML = live.map((w) => `<div>${Fmt.esc(line(w, s.rows[keyOf(w)], n))}</div>`).join("")
+        + '<button type="button" data-close title="Hide until the price changes" style="position:absolute;'
+        + 'top:4px;right:6px;background:none;border:0;color:#fff;font-size:18px;cursor:pointer">&times;</button>';
+    }
+    Panel.refresh("exportwatch");
+  }
+
+  function start() {
+    poll();
+    setInterval(poll, POLL_MS);
+    // Les autres onglets publient leurs relevés toutes les minutes : repeindre souvent suffit
+    setInterval(paint, 10_000);
+  }
+
+  async function loadShop(code) {
+    if (shopItems[code]) return;
+    shopItems[code] = [];
+    try {
+      const shop = await Oracle.shop(code);
+      shopItems[code] = (shop.items || []).slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    } catch (e) { delete shopItems[code]; }
+    Panel.refresh("exportwatch");
+  }
+
+  const form = { code: "can" };
+
+  function render(el) {
+    if (!Torn.haveKey() || !Oracle.haveToken()) {
+      el.innerHTML = '<div class="o-empty">Needs your Torn key and a Torn Oracle account.</div>';
+      return;
+    }
+    loadShop(form.code);
+    const rows = shared().rows;
+    const kit = Settings.get("capacity") - units();
+    const lines = list().map((w) => {
+      const r = rows[keyOf(w)];
+      const cells = !r ? '<td colspan="3" class="muted">Waiting…</td>'
+        : r.error ? `<td colspan="3" class="muted">${Fmt.esc(r.error)}</td>`
+        : `<td class="num">${Fmt.esc(Fmt.price(r.price))}<span class="o-sub">${Fmt.esc(r.where)}</span></td>
+           <td class="num">${Fmt.esc(Fmt.price(r.pays))}</td>
+           <td class="num"><span class="${r.margin >= w.min ? "go" : "muted"}">${r.margin >= 0 ? "+" : ""}${
+             Fmt.esc(Fmt.price(r.margin))}</span><span class="o-sub">${Fmt.esc(Fmt.money(r.margin * units()))}</span></td>`;
+      return `<tr><td>${Fmt.esc(w.name)}<span class="o-sub">${Fmt.esc(Data.name(w.code))}</span></td>${cells}
+        <td class="num">${Fmt.esc(Fmt.price(w.min))}</td>
+        <td><button type="button" class="o-link" data-del="${Fmt.esc(keyOf(w))}" title="Stop watching">&times;</button></td></tr>`;
+    }).join("");
+    const items = shopItems[form.code] || [];
+    el.innerHTML = `
+      ${lines ? `<div class="o-scroll"><table><thead><tr><th>Item</th><th class="num">Torn now</th>
+        <th class="num">Shop pays</th><th class="num">Margin</th><th class="num">Alert at</th><th></th></tr></thead>
+        <tbody>${lines}</tbody></table></div>` : '<div class="o-empty">No export watch yet.</div>'}
+      <div class="o-note">Torn now: cheapest of the item market and bazaars (weav3r.dev). Margin total for
+        ${Fmt.count(units())} items: suitcase ${Fmt.count(Settings.get("capacity"))} minus ${Fmt.count(kit)} in the trip kit.
+        Checked every minute while a Torn page is open.</div>
+      <div class="o-group"><h4>New export watch</h4>
+        <div class="o-field"><span class="o-field-label">Country</span>
+          <select data-ew="code">${Data.list().map((c) => `<option value="${c.code}"${
+            c.code === form.code ? " selected" : ""}>${Fmt.esc(c.name)}</option>`).join("")}</select></div>
+        <div class="o-field"><span class="o-field-label">Item</span>
+          <select data-ew="id">${items.map((i) => `<option value="${i.item_id}">${Fmt.esc(i.name)}</option>`).join("")}</select></div>
+        <div class="o-field"><span class="o-field-label">Alert from margin (each)</span>
+          <input type="number" data-ew="min" min="0" step="100" placeholder="5000"></div>
+        <button type="button" class="o-btn" data-ew-add>Add</button>
+      </div>`;
+    el.querySelector('[data-ew="code"]').addEventListener("change", (ev) => {
+      form.code = ev.target.value;
+      Panel.refresh("exportwatch", true);
+    });
+    el.querySelector("[data-ew-add]").addEventListener("click", () => {
+      const sel = el.querySelector('[data-ew="id"]');
+      const min = Number(el.querySelector('[data-ew="min"]').value);
+      if (!sel.value || !(min >= 0)) return;
+      const w = { id: Number(sel.value), name: sel.selectedOptions[0].textContent, code: form.code, min };
+      Env.write(WATCHES, list().filter((x) => keyOf(x) !== keyOf(w)).concat(w));
+      poll(true);
+    });
+    for (const b of el.querySelectorAll("[data-del]")) {
+      b.addEventListener("click", () => {
+        Env.write(WATCHES, list().filter((x) => keyOf(x) !== b.dataset.del));
+        paint();
+      });
+    }
+  }
+
+  return {
+    start,
+    view: { id: "exportwatch", label: "Export watch", render, badge: () => hits().length || null,
+            refresh: () => poll(), refreshEvery: POLL_MS },
+  };
+})();
+
 Env.ready().then(function boot() {
   "use strict";
 
   Settings.load();
+  ExportWatch.start();
+  if (!/sid=travel/.test(location.href)) return;
   Trip.load();
   Alerts.load();
   Style.install();
@@ -8831,6 +9065,7 @@ Env.ready().then(function boot() {
   Panel.register(ViewToday);
   Panel.register(ViewShops);
   Panel.register(ViewExports);
+  Panel.register(ExportWatch.view);
   Panel.register(ViewItems);
   Panel.register(ViewWatches);
   Panel.register(ViewMuseum);
