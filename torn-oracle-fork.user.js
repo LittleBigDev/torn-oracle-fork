@@ -8832,6 +8832,8 @@ const ExportWatch = (() => {
   const BAR_ID = "oracle-fork-export";
 
   let shopItems = {};
+  // Temporaire : déclenchements simulés (bouton Test), affichés jusqu'à la croix du bandeau
+  let tests = {};
 
   const list = () => Env.read(WATCHES, []);
   const shared = () => Env.read(SHARED, { at: 0, rows: {}, notified: {}, dismissed: {} });
@@ -8943,8 +8945,10 @@ const ExportWatch = (() => {
     }
     if (changed) Env.write(SHARED, s);
 
+    const shown = live.map((w) => [w, s.rows[keyOf(w)]])
+      .concat(list().filter((w) => tests[keyOf(w)]).map((w) => [w, tests[keyOf(w)]]));
     let bar = document.getElementById(BAR_ID);
-    if (!live.length) { if (bar) bar.remove(); }
+    if (!shown.length) { if (bar) bar.remove(); }
     else {
       if (!bar) {
         bar = document.createElement("div");
@@ -8957,11 +8961,12 @@ const ExportWatch = (() => {
           const now = shared();
           for (const w of hits()) now.dismissed[keyOf(w)] = now.rows[keyOf(w)].price;
           Env.write(SHARED, now);
+          tests = {};
           paint();
         });
         document.body.appendChild(bar);
       }
-      bar.innerHTML = live.map((w) => `<div>${Fmt.esc(line(w, s.rows[keyOf(w)], n))}</div>`).join("")
+      bar.innerHTML = shown.map(([w, r]) => `<div>${Fmt.esc(line(w, r, n))}</div>`).join("")
         + '<button type="button" data-close title="Hide until the price changes" style="position:absolute;'
         + 'top:4px;right:6px;background:none;border:0;color:#fff;font-size:18px;cursor:pointer">&times;</button>';
     }
@@ -9005,7 +9010,8 @@ const ExportWatch = (() => {
              Fmt.esc(Fmt.price(r.margin))}</span><span class="o-sub">${Fmt.esc(Fmt.money(r.margin * units()))}</span></td>`;
       return `<tr><td>${Fmt.esc(w.name)}<span class="o-sub">${Fmt.esc(Data.name(w.code))}</span></td>${cells}
         <td class="num">${Fmt.esc(Fmt.price(w.min))}</td>
-        <td><button type="button" class="o-link" data-del="${Fmt.esc(keyOf(w))}" title="Stop watching">&times;</button></td></tr>`;
+        <td><button type="button" class="o-link" data-test="${Fmt.esc(keyOf(w))}" title="Simulate an alert">Test</button>
+          <button type="button" class="o-link" data-del="${Fmt.esc(keyOf(w))}" title="Stop watching">&times;</button></td></tr>`;
     }).join("");
     const items = shopItems[form.code] || [];
     el.innerHTML = `
@@ -9037,6 +9043,20 @@ const ExportWatch = (() => {
       Env.write(WATCHES, list().filter((x) => keyOf(x) !== keyOf(w)).concat(w));
       poll(true);
     });
+    for (const b of el.querySelectorAll("[data-test]")) {
+      b.addEventListener("click", () => {
+        const w = list().find((x) => keyOf(x) === b.dataset.test);
+        if (!w) return;
+        const real = rows[keyOf(w)];
+        // Relevé réel s'il existe, marge forcée au seuil ; sinon des prix inventés
+        const price = real && !real.error ? real.price : 50_000;
+        tests[keyOf(w)] = { price, where: real && real.where || "Bazaar", qty: real && real.qty || 100,
+                            pays: price + w.min, margin: w.min };
+        Env.toast("Export deal (test)", line(w, tests[keyOf(w)], units()));
+        beep();
+        paint();
+      });
+    }
     for (const b of el.querySelectorAll("[data-del]")) {
       b.addEventListener("click", () => {
         Env.write(WATCHES, list().filter((x) => keyOf(x) !== b.dataset.del));
