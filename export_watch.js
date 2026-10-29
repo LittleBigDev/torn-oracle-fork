@@ -7,6 +7,7 @@ const ExportWatch = (() => {
   const SHARED = "fork_export_state";
   const POLL_MS = 60_000;
   const BAR_ID = "oracle-fork-export";
+  const NOTIFY = "fork_export_notify";
 
   let shopItems = {};
 
@@ -108,7 +109,9 @@ const ExportWatch = (() => {
   function paint() {
     const s = shared();
     const n = units();
-    const live = hits().filter((w) => s.dismissed[keyOf(w)] !== s.rows[keyOf(w)].price);
+    // Notifications coupées : rien hors de l'onglet Export watch
+    const live = !Env.read(NOTIFY, true) ? []
+      : hits().filter((w) => s.dismissed[keyOf(w)] !== s.rows[keyOf(w)].price);
     let changed = false;
     for (const w of live) {
       const r = s.rows[keyOf(w)];
@@ -218,7 +221,7 @@ const ExportWatch = (() => {
       const r = rows[keyOf(w)];
       const cells = !r ? '<td colspan="3" class="muted">Waiting…</td>'
         : r.error ? `<td colspan="3" class="muted">${Fmt.esc(r.error)}</td>`
-        : `<td class="num">${Fmt.esc(Fmt.price(r.price))}<span class="o-sub">${Fmt.esc(r.where)}</span></td>
+        : `<td class="num">${Fmt.esc(Fmt.price(r.price))}<span class="o-sub"><a href="${Fmt.esc(r.url)}">${Fmt.esc(r.where)}</a></span></td>
            <td class="num">${Fmt.esc(Fmt.price(r.pays))}</td>
            <td class="num"><span class="${r.margin >= w.min ? "go" : "muted"}">${r.margin >= 0 ? "+" : ""}${
              Fmt.esc(Fmt.price(r.margin))}</span><span class="o-sub">${Fmt.esc(Fmt.money(r.margin * units()))}</span></td>`;
@@ -231,6 +234,8 @@ const ExportWatch = (() => {
       ${lines ? `<div class="o-scroll"><table><thead><tr><th>Item</th><th class="num">Torn now</th>
         <th class="num">Shop pays</th><th class="num">Margin</th><th class="num">Alert at</th><th></th></tr></thead>
         <tbody>${lines}</tbody></table></div>` : '<div class="o-empty">No export watch yet.</div>'}
+      <label class="o-field"><input type="checkbox" data-ew="notify"${Env.read(NOTIFY, true) ? " checked" : ""}>
+        Enable notifications</label>
       <div class="o-note">Torn now: cheapest of the item market and bazaars (weav3r.dev). Margin total for
         ${Fmt.count(units())} items: suitcase ${Fmt.count(Settings.get("capacity"))} minus ${Fmt.count(kit)} in the trip kit.
         Checked every minute while a Torn page is open.</div>
@@ -247,6 +252,10 @@ const ExportWatch = (() => {
     el.querySelector('[data-ew="code"]').addEventListener("change", (ev) => {
       form.code = ev.target.value;
       Panel.refresh("exportwatch", true);
+    });
+    el.querySelector('[data-ew="notify"]').addEventListener("change", (ev) => {
+      Env.write(NOTIFY, ev.target.checked);
+      paint();
     });
     el.querySelector("[data-ew-add]").addEventListener("click", () => {
       const sel = el.querySelector('[data-ew="id"]');
