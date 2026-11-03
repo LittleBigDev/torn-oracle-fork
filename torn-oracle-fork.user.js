@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.5-fork.13
+// @version      2.6.5-fork.14
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.5 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -8118,15 +8118,21 @@ const Assist = (() => {
     return travelData("addSlotItem", { method: "POST", body });
   }
 
-  // Fork : vente à l'étranger. PLACEHOLDER : requête travelData de vente pas encore relevée
-  // (F12, onglet Network, en vendant un objet à la boutique étrangère). D'ici là, vente à la main.
-  async function sellItem(ref, amount) {
+  // Fork : vente à l'étranger (requête relevée le 03/11/2026 : step=sellItem, {slotID, amount}).
+  // Vend tout le slot ; s'il reste un slot du même objet, le bouton repropose la vente.
+  async function sellItem(ref) {
+    const read = await readSlots();
+    if (!slots) return read;
+    const slot = slots.find((s) => s && s.item && Number(s.item.ID) === ref.id);
     slots = null;
-    return { ok: false, message: "Sell " + amount + " " + ref.name + " by hand (not automated yet)." };
+    if (!slot) return { ok: false, message: "No " + ref.name + " in your travel inventory." };
+    // ponytail: nom du champ quantité du slot non vérifié, plusieurs essayés ; à défaut 1 (à corriger si la vente part à l'unité)
+    const amount = Number(slot.quantity || slot.amount || slot.qty || slot.item.quantity || slot.item.amount) || 1;
+    return travelData("sellItem", { method: "POST", body: { slotID: slot.ID, amount } });
   }
 
   const ACTIONS = {
-    sell: (d) => sellItem(d.ref, d.amount),
+    sell: (d) => sellItem(d.ref),
     pack: (d) => packItem(d.ref),
     use: (d) => useItem(d.ref),
     buy: (d) => travelData("buy", { query: "&itemID=" + d.ref.id + "&amount=" + d.amount }),
@@ -8237,7 +8243,7 @@ const Assist = (() => {
     if (f.mode === "flight" && toSell.length) return null;
     if (f.mode === "abroad" && toSell.length) {
       const ref = toSell[0];
-      return { act: "sell", ref, amount: count(ref), label: "Sell " + ref.name,
+      return { act: "sell", ref, label: "Sell " + ref.name,
                note: "Sell before you self-hosp." };
     }
 
