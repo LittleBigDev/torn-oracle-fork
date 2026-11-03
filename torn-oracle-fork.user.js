@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.5-fork.12
+// @version      2.6.5-fork.13
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.5 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -431,6 +431,8 @@ const Settings = (() => {
       label: "Trip kit" },
     { name: "assist_track", group: "assist", kind: "itemrefs", def: [], hidden: true,
       sync: "assist_track", label: "Tracked items" },
+    { name: "assist_sell", group: "assist", kind: "itemrefs", def: [], hidden: true,
+      label: "Packed items to sell" },
 
     { name: "collapsed", group: "display", kind: "bool", def: false, hidden: true,
       label: "Panel collapsed" },
@@ -8116,7 +8118,15 @@ const Assist = (() => {
     return travelData("addSlotItem", { method: "POST", body });
   }
 
+  // Fork : vente à l'étranger. PLACEHOLDER : requête travelData de vente pas encore relevée
+  // (F12, onglet Network, en vendant un objet à la boutique étrangère). D'ici là, vente à la main.
+  async function sellItem(ref, amount) {
+    slots = null;
+    return { ok: false, message: "Sell " + amount + " " + ref.name + " by hand (not automated yet)." };
+  }
+
   const ACTIONS = {
+    sell: (d) => sellItem(d.ref, d.amount),
     pack: (d) => packItem(d.ref),
     use: (d) => useItem(d.ref),
     buy: (d) => travelData("buy", { query: "&itemID=" + d.ref.id + "&amount=" + d.amount }),
@@ -8188,6 +8198,7 @@ const Assist = (() => {
       mode,
       kit: Settings.get("assist_kit"),
       track: tracked(),
+      sell: Settings.get("assist_sell"),
       carried: inv ? inv.items : null,
       room: inv ? inv.slots - inv.packed : null,
       hospital: inHospital(),
@@ -8220,6 +8231,14 @@ const Assist = (() => {
         }
       }
       return { label: "Trip kit packed", note: "Ready to fly." };
+    }
+
+    const toSell = (f.sell || []).filter((ref) => count(ref) > 0);
+    if (f.mode === "flight" && toSell.length) return null;
+    if (f.mode === "abroad" && toSell.length) {
+      const ref = toSell[0];
+      return { act: "sell", ref, amount: count(ref), label: "Sell " + ref.name,
+               note: "Sell before you self-hosp." };
     }
 
     if (f.mode === "flight") {
@@ -8556,6 +8575,7 @@ const ViewAssist = (() => {
     const kit = Settings.get("assist_kit");
     const picked = Settings.get("assist_track");
     const track = Assist.tracked();
+    const sell = Settings.get("assist_sell");
     const items = error
       ? `<p class="o-note is-warn">${Fmt.esc(error)}
            <button type="button" class="o-link" data-act="retry">Try again</button></p>`
@@ -8587,6 +8607,20 @@ const ViewAssist = (() => {
           <input type="number" data-extra-n min="1" max="${Settings.MAX_EXTRA_COUNT}" step="1"
                  value="1" aria-label="How many" style="width:4.5em">
           <button type="button" class="o-btn" data-act="pack">Add</button></div>` : ""}
+      </div>
+      <div class="o-group"><h4>Packed items to sell</h4>
+        ${sell.length ? `<div class="o-chips">${sell.map((ref) => `
+          <span class="o-chip is-on">${Fmt.esc(ref.name)}
+            <button type="button" class="o-link" data-unsell="${ref.id}" aria-label="Remove">×</button>
+          </span>`).join("")}</div>` : ""}
+        <p class="o-note">${kit.extras.length ? "Sold when you land, before you self-hosp."
+                                             : "Add items to pack first."}</p>
+        ${kit.extras.length ? `<div class="o-keyform">
+          <input type="text" data-sell list="oracle-sell-items" autocomplete="off"
+                 placeholder="Add a packed item">
+          <button type="button" class="o-btn" data-act="sell">Add</button></div>
+          <datalist id="oracle-sell-items">${kit.extras.filter((e) => !sell.some((r) => r.id === e.id))
+            .map((e) => `<option value="${Fmt.esc(e.name)}"></option>`).join("")}</datalist>` : ""}
       </div>
       <div class="o-group"><h4>Tracked items</h4>
         ${track.length ? `<div class="o-chips">${track.map((ref, i) => `
@@ -8636,6 +8670,19 @@ const ViewAssist = (() => {
     Panel.refresh("assist", true);
   }
 
+  function addSell(el) {
+    const input = el.querySelector("[data-sell]");
+    const name = input ? input.value.trim() : "";
+    if (!name) return;
+    const hit = Settings.get("assist_kit").extras.find((e) => e.name.toLowerCase() === name.toLowerCase());
+    if (!hit) { tell("Add " + name + " to Other items to pack first.", "warn"); return; }
+    const sell = Settings.get("assist_sell");
+    if (sell.some((r) => r.id === hit.id)) { tell(hit.name + " is already in the list.", "warn"); return; }
+    Settings.set("assist_sell", [...sell, { id: hit.id, name: hit.name }]);
+    Assist.paint();
+    Panel.refresh("assist", true);
+  }
+
   function addExtra(el) {
     const input = el.querySelector("[data-extra]");
     const name = input ? input.value : "";
@@ -8662,6 +8709,15 @@ const ViewAssist = (() => {
       });
     }
     const meds = el.querySelector('input[data-kit="meds"]');
+    const sellInput = el.querySelector("[data-sell]");
+    if (sellInput) sellInput.addEventListener("keydown", (ev) => { if (ev.key === "Enter") addSell(el); });
+    for (const btn of el.querySelectorAll("[data-unsell]")) {
+      btn.addEventListener("click", () => {
+        Settings.set("assist_sell", Settings.get("assist_sell").filter((r) => r.id !== Number(btn.dataset.unsell)));
+        Assist.paint();
+        Panel.refresh("assist", true);
+      });
+    }
     if (meds) meds.addEventListener("change", () => setKit({ meds: Number(meds.value) || 0 }));
     const track = el.querySelector("[data-track]");
     if (track) {
@@ -8674,6 +8730,7 @@ const ViewAssist = (() => {
     for (const btn of el.querySelectorAll("[data-unpack]")) {
       btn.addEventListener("click", () => {
         const id = Number(btn.dataset.unpack);
+        Settings.set("assist_sell", Settings.get("assist_sell").filter((r) => r.id !== id));
         setKit({ extras: Settings.get("assist_kit").extras.filter((e) => e.id !== id) });
       });
     }
@@ -8681,6 +8738,7 @@ const ViewAssist = (() => {
       btn.addEventListener("click", () => {
         if (btn.dataset.act === "track") addTracked(el);
         if (btn.dataset.act === "pack") addExtra(el);
+        if (btn.dataset.act === "sell") addSell(el);
         if (btn.dataset.act === "retry") { error = null; loadCatalogue(); }
       });
     }
