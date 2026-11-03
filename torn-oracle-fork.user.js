@@ -8123,7 +8123,7 @@ const Assist = (() => {
   async function sellItem(ref) {
     const read = await readSlots();
     if (!slots) return read;
-    // Un slot par unité, sans champ quantité ; tous portent l'ID du stack (relevé le 03/11/2026)
+    // Un slot par unité (ID distincts), sans champ quantité ; Torn vend amount unités à partir du premier slot (relevé le 03/11/2026)
     const held = slots.filter((s) => s && s.item && Number(s.item.ID) === ref.id);
     slots = null;
     if (!held.length) return { ok: false, message: "No " + ref.name + " in your travel inventory." };
