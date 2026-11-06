@@ -18,6 +18,10 @@ The Shops tab has a **Sell** column showing that channel (Traders, Item market, 
 
 **Assist** tab, **Packed items to sell** list: items from "Other items to pack" to sell as soon as you land, before you self-hosp. While one of them is still in your suitcase, the button stays hidden during the flight, then offers "Sell <item>" once you land, one item after another in list order. Once everything is sold, the button goes back to its normal behavior (self-hosp, restock, buy, fly home).
 
+## Presets
+
+**Settings** tab, **Presets** section: save your trip, buying, forecast and Assist settings (kit, tracked items, items to sell) under a name, then load them in one click. Your key, account, alerts, display and suitcase size are not included. With the active preset's name in the box, the button saves your changes to it; another name saves a new preset ("Replace" if that name already exists). "(modified)" shows when your settings no longer match the active preset. Presets are stored in this browser only.
+
 ## Installation
 
 With Violentmonkey or Tampermonkey, open [torn-oracle-fork.user.js](https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js) and confirm. Updates then arrive automatically.
@@ -49,6 +53,10 @@ Onglet **Export watch** : un objet, un pays, une marge minimale par unité. Tout
 ### Objets à vendre à l'arrivée
 
 Onglet **Assist**, liste **Packed items to sell** : des objets d'« Other items to pack » à vendre dès l'arrivée, avant le self-hosp. Tant qu'il en reste un dans la valise, le bouton ne s'affiche pas pendant le vol, puis propose « Sell <objet> » à l'arrivée, un objet après l'autre dans l'ordre de la liste. Une fois tout vendu, le bouton reprend son comportement normal (self-hosp, restock, achat, retour).
+
+### Presets
+
+Onglet **Settings**, section **Presets** : sauvegarde sous un nom les réglages de voyage, d'achat, de prévision et d'Assist (kit, objets suivis, objets à vendre), rechargés ensuite en un clic. Clé, compte, alertes, affichage et taille de valise n'en font pas partie. Avec le nom du preset actif dans le champ, le bouton enregistre ses modifications ; un autre nom crée un nouveau preset (« Replace » si ce nom existe déjà). « (modified) » s'affiche quand les réglages ne correspondent plus au preset actif. Les presets restent dans ce navigateur.
 
 ### Installation
 
