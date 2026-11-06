@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.5-fork.16
+// @version      2.6.6-fork.16
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.5 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
+// @description  Fork de Torn Oracle: Travel 2.6.6 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -358,6 +358,14 @@ const Settings = (() => {
     { name: "capacity", group: "trips", kind: "int", def: 28, min: 1, max: 500, sync: "capacity",
       label: "Suitcase size",
       help: "Items you carry per flight." },
+
+    { name: "extra_slots", group: "trips", kind: "int", def: 0, min: 0, max: 50,
+      label: "Company extra slots",
+      help: "Slots your job adds for flowers or plushies only. Read from the travel agency." },
+    { name: "extra_type", group: "trips", kind: "choice", def: "Flower",
+      choices: () => [["Flower", "Flowers"], ["Plushie", "Plushies"]],
+      showIf: () => Settings.get("extra_slots") > 0,
+      label: "Extra slots hold" },
     { name: "end_hours", group: "trips", kind: "number", def: 8, min: 0.5, max: 16, step: 0.5,
       unit: "h", sync: "end_hours",
       label: "Plan ahead",
@@ -425,6 +433,10 @@ const Settings = (() => {
     { name: "post_plan", group: "alerts", kind: "bool", def: false, sync: "post_plan",
       label: "Show my plan on Discord",
       help: "Posts your plan to your Discord thread or DMs and updates it when you re-plan." },
+
+    { name: "share_stock", group: "stock", kind: "bool", def: true,
+      label: "Share shop stock",
+      help: "Sends the stock and prices of the foreign shop you are viewing to Torn Oracle for restock times. Readings are stored without your name. The account that sent them is kept for 14 days." },
 
     { name: "assist_kit", group: "assist", kind: "kit", hidden: true, sync: "assist_kit",
       def: { hosp: null, med: null, meds: 0, extras: [] },
@@ -675,7 +687,7 @@ const Settings = (() => {
     SCHEMA, BY_NAME, VERSION, MAX_MEDS, MAX_TRACKED, MAX_EXTRAS, MAX_EXTRA_COUNT,
     load, all, get, set, apply, sync, onChange, exportSafe, exportShared, importShared,
     planCountries, aimAtRestock,
-    groups: () => ["account", "trips", "buying", "forecast", "alerts", "display"],
+    groups: () => ["account", "trips", "buying", "forecast", "alerts", "stock", "display"],
   };
 })();
 
@@ -685,7 +697,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.5";
+  const SCRIPT_VERSION = "2.6.6";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -871,6 +883,8 @@ const Oracle = (() => {
 
   const heartbeat = (body) => post("/trip/heartbeat", body).then((r) => r.data);
 
+  const shareStock = (body) => post("/stock", body).then((r) => r.data);
+
   const planGet = () => get("/plan").then((r) => r.data);
   const planPut = (body) => post("/plan", body).then((r) => r.data);
 
@@ -898,7 +912,7 @@ const Oracle = (() => {
     me, countries, shop, itemStock, forecasts, board, exports, announcements,
     watches, addWatch, removeWatch,
     tokensList, tokenCreate, tokenDelete,
-    putTrip, clearTrip, heartbeat,
+    putTrip, clearTrip, heartbeat, shareStock,
     settingsGet, settingsSave, planGet, planPut,
     signup,
     updateDue: () => updateDue,
@@ -1855,10 +1869,29 @@ const Trip = (() => {
     s.legs = plan.legs.slice();
     s.runtime = runtime;
     s.active = true;
+    catchUp(s);
     revision += 1;
     save();
     if (!same) journal("plan", "Following the plan from another device.");
     return kind;
+  }
+
+  function catchUp(s) {
+    const i = s.cursor;
+    const rt = s.runtime[i];
+    const prev = s.runtime[i - 1];
+    let phase = null;
+    let at = 0;
+    if (rt && rt.status === "enroute") { phase = "outbound"; at = rt.departedAt; }
+    else if (rt && rt.status === "abroad") { phase = "abroad"; at = rt.landedAt; }
+    else if (rt && rt.status === "returning") { phase = "inbound"; at = rt.leftAt; }
+    else if (prev && prev.homeAt) { phase = "home"; at = prev.homeAt; }
+    if (!phase || !at || at <= (s.observedAt || 0) || phase === s.phase) return;
+    s.phase = phase;
+    s.since = at;
+    s.country = phase === "outbound" || phase === "abroad" ? legCountry(i) : null;
+    s.from = phase === "inbound" ? legCountry(i) : null;
+    s.arrivalAt = phase === "outbound" || phase === "inbound" ? rt.arrivalAt : null;
   }
 
   function currentIndex() {
@@ -2127,7 +2160,8 @@ const Trip = (() => {
 
   function carryable(i) {
     const s = get();
-    return Math.max(Settings.get("capacity") || 0, s.legs[i].units || 0);
+    const bag = (Settings.get("capacity") || 0) + (Settings.get("extra_slots") || 0);
+    return Math.max(bag, s.legs[i].units || 0);
   }
 
   function shelfFor(i) {
@@ -3255,8 +3289,13 @@ function plannerCore() {
     return { taken: next, enabled: true };
   }
 
+  function bagFor(prep, cfg) {
+    const extra = cfg.extraSlots && prep.type === cfg.extraType ? cfg.extraSlots : 0;
+    return cfg.capacity + extra;
+  }
+
   function unitsFor(prep, cfg, cash, stockCap) {
-    let units = cfg.capacity;
+    let units = bagFor(prep, cfg);
     if (stockCap !== null && stockCap >= 0) units = Math.min(units, stockCap);
     if (cash !== null && prep.cost > 0) units = Math.min(units, Math.floor(cash / prep.cost));
     return Math.max(0, Math.trunc(units));
@@ -3544,6 +3583,7 @@ function plannerCore() {
         country: it.country,
         itemId: it.item_id,
         name: it.name,
+        type,
         cost: it.cost,
         margin,
         stockQty: it.quantity || 0,
@@ -3736,6 +3776,8 @@ const Plan = (() => {
       now: originMs,
       endTime: endTime || originMs + Settings.get("end_hours") * 3600_000,
       capacity: Settings.get("capacity"),
+      extraSlots: Settings.get("extra_slots"),
+      extraType: Settings.get("extra_type").toLowerCase(),
       haircutPct: Settings.get("haircut_pct"),
       sellTo: Settings.get("sell_to"),
       minMargin: Settings.get("min_margin"),
@@ -4218,19 +4260,30 @@ const Page = (() => {
   function travelInventory() {
     const list = document.querySelector('ul[aria-label^="Inventory"]');
     if (!list) return null;
-    const slots = list.querySelectorAll(":scope > li").length;
+    const lis = list.querySelectorAll(":scope > li");
     const m = /(\d+)/.exec(list.getAttribute("aria-label") || "");
-    if (!slots || !m) return null;
+    if (!lis.length || !m) return null;
+    let special = 0;
+    let specialType = null;
+    for (const li of lis) {
+      const img = li.querySelector('img[class*="silhouette"]');
+      if (!img) continue;
+      special += 1;
+      const id = /\/items\/(\d+)\//.exec(img.getAttribute("src") || img.getAttribute("srcset") || "");
+      if (id) specialType = SILHOUETTES[id[1]] || specialType;
+    }
     const items = [];
     for (const b of list.querySelectorAll(":scope > li > button[aria-label]")) {
       const name = /^(.*) slot \d+$/.exec(b.getAttribute("aria-label"));
       if (name) items.push(name[1]);
     }
-    return { slots, packed: Number(m[1]), items };
+    return { slots: lis.length - special, special, specialType, packed: Number(m[1]), items };
   }
 
+  const SILHOUETTES = { 187: "Plushie", 277: "Flower" };
+
   function inventoryKey(inv) {
-    return inv ? inv.slots + "/" + inv.packed + "/" + inv.items.join("|") : "";
+    return inv ? [inv.slots, inv.special, inv.specialType, inv.packed, inv.items.join("|")].join("/") : "";
   }
 
   function shopRows() {
@@ -5859,6 +5912,9 @@ const ViewToday = (() => {
         : bought > 0 && rt.item ? " · planned " + Fmt.esc(rt.item.swappedFrom) : "";
       const conf = (rt.status === "pending" || rt.status === "enroute") && typeof leg.hit === "number"
         ? " · " + Fmt.esc(Fmt.hitPct(leg.hit)) + "% confidence" : "";
+      const exp = rt.status === "pending" ? ViewExports.bestFor(leg.country) : null;
+      const take = exp ? `<span class="o-sub">Take ${Fmt.esc(exp.units)} x ${Fmt.esc(exp.name)} `
+        + `<span class="go">+${Fmt.esc(Fmt.money(exp.profit))}</span></span>` : "";
       const editable = rt.landedAt !== null;
 
       const landAt = rt.landedAt || (rt.status === "enroute" && rt.arrivalAt) || leg.land;
@@ -5868,7 +5924,7 @@ const ViewToday = (() => {
         <td class="clock">${Fmt.esc(Fmt.clock(rt.departedAt || leg.depart))}
           <span class="o-sub">${legState(i, rt, now)}</span></td>
         <td>${what}
-          <span class="o-sub">${Flags.place(Trip.legCountry(i))}${note}${conf}</span></td>
+          <span class="o-sub">${Flags.place(Trip.legCountry(i))}${note}${conf}</span>${take}</td>
         <td class="num o-col-mid money">${Fmt.esc(Fmt.money(spend))}
           <span class="o-sub">${Fmt.esc(Fmt.price(leg.unit_cost || 0))} each</span></td>
         <td class="num clock o-col-extra">${Fmt.esc(Fmt.clock(landAt))}
@@ -6359,7 +6415,8 @@ const ViewShops = (() => {
         : "";
       lastType = item.type;
       const qty = item.quantity || 0;
-      const cap = Settings.get("capacity");
+      const cap = Settings.get("capacity")
+        + (item.type === Settings.get("extra_type") ? Settings.get("extra_slots") : 0);
       const ppm = Data.profitPerMinute(m, data.code, Settings.get("travel_type"), cap);
 
       const land = f
@@ -7265,6 +7322,7 @@ const ViewSettings = (() => {
     buying: ["What to buy", "Countries, categories, price and profit"],
     forecast: ["Forecast", "How sure a landing must be"],
     alerts: ["Alerts", "Browser and Discord"],
+    stock: ["Shop stock", "What you share from foreign shops"],
     display: ["Display", "Minimal view, spacing, clock"],
     share: ["Share settings", "Copy your plan settings or paste someone else's"],
   };
@@ -7635,11 +7693,17 @@ const ViewSettings = (() => {
     for (const input of el.querySelectorAll("[data-set]")) {
       const name = input.dataset.set;
       const r = Settings.BY_NAME[name];
-      input.addEventListener("change", () => {
+      const money = input.classList.contains("o-money");
+
+      if (money) {
+        input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
+      }
+      input.addEventListener(money ? "blur" : "change", () => {
         const value = r.kind === "bool" ? input.checked
-          : r.unit === "$" ? parseMoney(input.value)
+          : money ? parseMoney(input.value)
             : (r.kind === "int" || r.kind === "number") ? Number(input.value)
               : input.value;
+        if (money && value === Settings.get(name)) return;
         if (!Settings.set(name, value)) {
           tell(r.label + ": that value is out of range.", "warn");
           Panel.refresh("settings");
@@ -7905,7 +7969,7 @@ const ViewSettings = (() => {
     }
   }
 
-  const STRUCTURAL = ["capacity", "haircut_pct", "sell_to", "travel_type", "end_hours", "min_margin",
+  const STRUCTURAL = ["capacity", "extra_slots", "extra_type", "haircut_pct", "sell_to", "travel_type", "end_hours", "min_margin",
                       "max_cost", "plan_countries", "item_types", "plan_items", "landing_target",
                       "landing_floor", "drug_priority", "max_drug_wait"];
 
@@ -7939,10 +8003,12 @@ const ViewExports = (() => {
   let loading = false;
   let error = null;
   let expanded = false;
+  let failedAt = 0;
 
   async function load(force) {
     if (!Oracle.haveToken() || loading) return;
     if (!force && data && Date.now() - data.at < 45_000) return;
+    if (!force && Date.now() - failedAt < 60_000) return;
     loading = true;
     error = null;
     Panel.refresh("exports");
@@ -7951,10 +8017,31 @@ const ViewExports = (() => {
       data = { rows: payload.exports || [], at: Date.now() };
     } catch (err) {
       error = err.message;
+      failedAt = Date.now();
     } finally {
       loading = false;
-      Panel.refresh("exports");
+      Panel.refresh();
     }
+  }
+
+  function fillable() {
+    const cap = Settings.get("capacity");
+    return data ? data.rows.filter((r) => r.listed >= cap) : [];
+  }
+
+  function bestFor(country) {
+    load();
+    if (!data) return null;
+    const row = fillable().find((r) => r.country === country);
+    if (!row) return null;
+    const units = Settings.get("capacity");
+    return { name: row.name, units, profit: row.margin * units };
+  }
+
+  function nextCountry() {
+    const s = Trip.get();
+    const i = s.runtime.findIndex((rt) => rt.status === "pending");
+    return i >= 0 && s.active ? s.legs[i].country : null;
   }
 
   function render(el) {
@@ -7966,34 +8053,45 @@ const ViewExports = (() => {
     if (loading && !data) { el.innerHTML = `<div class="o-empty">Reading the shops…</div>`; return; }
     if (error) { el.innerHTML = `<div class="o-note is-warn">${Fmt.esc(error)}</div>`; return; }
     if (!data) { el.innerHTML = `<div class="o-empty">Nothing loaded yet.</div>`; load(); return; }
-    if (!data.rows.length) {
-      el.innerHTML = `<div class="o-empty">No foreign shop pays more than Torn's market value right now.</div>`;
+    const rows = fillable();
+    if (!rows.length) {
+      el.innerHTML = `<div class="o-empty">No foreign shop pays more than bazaars charge in Torn right now.</div>`;
       return;
     }
     const cap = Settings.get("capacity");
-    const shown = expanded ? data.rows : data.rows.slice(0, ROW_CAP);
-    const rows = shown.map((r) => `<tr>
+    const next = nextCountry();
+    const best = next ? rows.find((r) => r.country === next) : null;
+    const head = next
+      ? `<div class="o-note">Next run to ${Flags.place(next)}: ${best
+          ? `take ${Fmt.esc(Fmt.count(cap))} x ${Fmt.esc(best.name)} for
+             <span class="go">+${Fmt.esc(Fmt.money(best.margin * cap))}</span>.`
+          : "no export pays there."}</div>`
+      : "";
+    const shown = expanded ? rows : rows.slice(0, ROW_CAP);
+    const body = shown.map((r) => `<tr${r.country === next ? ' class="leg-live"' : ""}>
         <td>${Fmt.esc(r.name)}<span class="o-sub">${Flags.place(r.country)}</span></td>
-        <td class="num">${Fmt.esc(Fmt.price(r.pays))}<span class="o-sub">Torn ${Fmt.esc(Fmt.price(r.market_value))}</span></td>
+        <td class="num">${Fmt.esc(Fmt.price(r.pays))}<span class="o-sub">bazaars ${Fmt.esc(Fmt.price(r.cost))}</span></td>
         <td class="num"><span class="go">+${Fmt.esc(Fmt.price(r.margin))}</span>
           <span class="o-sub">${Fmt.esc(Fmt.money(r.margin * cap))} for ${Fmt.esc(Fmt.count(cap))}</span></td>
-        <td class="num">${Fmt.esc(Fmt.count(r.quantity))}</td>
+        <td class="num">${Fmt.esc(Fmt.count(r.listed))}</td>
       </tr>`).join("");
-    const more = data.rows.length > ROW_CAP
-      ? `<button type="button" class="o-btn" data-act="expand">${expanded ? "Fewer" : "All " + data.rows.length}</button>`
+    const more = rows.length > ROW_CAP
+      ? `<button type="button" class="o-btn" data-act="expand">${expanded ? "Fewer" : "All " + rows.length}</button>`
       : "";
-    el.innerHTML = `<div class="o-scroll"><table>
-        <thead><tr><th>Item</th><th class="num">Shop pays</th><th class="num">Profit</th><th class="num">On shelf</th></tr></thead>
-        <tbody>${rows}</tbody></table></div>
+    el.innerHTML = `${head}<div class="o-scroll"><table>
+        <thead><tr><th>Item</th><th class="num">Shop pays</th><th class="num">Profit</th>
+          <th class="num" title="Units in bazaars under the shop price">Listed</th></tr></thead>
+        <tbody>${body}</tbody></table></div>
       <div class="o-acts">${more}</div>
-      <div class="o-note">Buy in Torn and sell to the shop abroad. A Black Market pays its
-        current price. Other shops pay 75% of theirs.</div>`;
+      <div class="o-note">Buy from bazaars in Torn and sell to the shop abroad. Bazaar price is the
+        average of the 5 cheapest listings. Items with too few listings under the shop price to fill
+        your suitcase are not shown.</div>`;
     const expand = el.querySelector('[data-act="expand"]');
     if (expand) expand.addEventListener("click", () => { expanded = !expanded; Panel.refresh("exports"); });
   }
 
   return {
-    id: "exports", label: "Exports", render, load,
+    id: "exports", label: "Exports", render, load, bestFor,
     badge: () => null,
     refresh: (force) => load(force), refreshEvery: 60_000,
   };
@@ -8421,6 +8519,7 @@ const Assist = (() => {
       readSlots();
     }
     if (mode === "abroad") {
+      StockShare.offer();
       noticeReady(step);
       loadWindows();
       if (step && step.watch) {
@@ -8886,6 +8985,60 @@ const ViewNews = (() => {
   return { id: "news", label: "News", render, badge: () => News.unread().length };
 })();
 
+const StockShare = (() => {
+  "use strict";
+
+  const GAP_MS = 5000;
+
+  let lastKey = "";
+  let lastAt = 0;
+  let timer = null;
+
+  function focused() {
+    try { return Env.visible() && document.hasFocus(); } catch (e) { return false; }
+  }
+
+  function shopCountry() {
+    const name = String(document.body.dataset.country || "").replace(/-/g, " ").toLowerCase();
+    const code = Data.CODE_BY_NAME[name] || null;
+    const known = Trip.get().country;
+    return code && (!known || known === code) ? code : null;
+  }
+
+  function enabled() {
+    return Settings.get("share_stock") && Oracle.haveToken();
+  }
+
+  function offer() {
+    if (timer || !enabled() || !focused()) return;
+    const wait = lastAt + GAP_MS - Date.now();
+    if (wait > 0) {
+      timer = setTimeout(() => { timer = null; send(); }, wait);
+      return;
+    }
+    send();
+  }
+
+  function send() {
+    if (!enabled() || !focused() || Page.mode() !== "abroad") return;
+    const code = shopCountry();
+    const rows = Page.shopRows();
+    if (!code || !rows.length) return;
+    const key = code + "|" + rows.map((r) => r.id + ":" + r.stock + ":" + r.price).join(",");
+    if (key === lastKey) return;
+    const readAt = Date.now();
+    lastKey = key;
+    lastAt = readAt;
+    Oracle.shareStock({
+      country: code,
+      age_ms: Date.now() - readAt,
+      items: rows.map((r) => ({ id: r.id, quantity: r.stock, cost: r.price || null })),
+    }).catch((err) => Env.log.warn("stock share failed", err.message));
+  }
+
+  return { offer };
+})();
+
 // Fork : alerte d'export. Prix le plus bas à Torn (item market et bazaars) comparé au prix de rachat
 // en direct d'une boutique étrangère ; bandeau sur toutes les pages, notification et bip au-dessus de la marge choisie.
 const ExportWatch = (() => {
@@ -9235,7 +9388,15 @@ Env.ready().then(function boot() {
       Assist.keptPacked(value.items).then((kept) => {
         if (kept === null || read !== inventoryReads) return;
         const free = Math.max(1, value.slots - kept);
-        if (Settings.get("capacity") !== free) { Settings.set("capacity", free); Panel.refresh(); }
+        let moved = false;
+        if (Settings.get("capacity") !== free) moved = Settings.set("capacity", free) || moved;
+        if (Settings.get("extra_slots") !== value.special) {
+          moved = Settings.set("extra_slots", value.special) || moved;
+        }
+        if (value.specialType && Settings.get("extra_type") !== value.specialType) {
+          moved = Settings.set("extra_type", value.specialType) || moved;
+        }
+        if (moved) Panel.refresh();
       });
     }
     if (name === "destination") {
