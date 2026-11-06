@@ -17,6 +17,8 @@ const Presets = (() => {
 
   const rows = () => Settings.SCHEMA.filter((r) => GROUPS.includes(r.group) && !SKIP.includes(r.name));
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // Fmt.esc n'échappe pas les guillemets : indispensable dans un attribut HTML
+  const attr = (v) => Fmt.esc(v).replace(/"/g, "&quot;");
 
   function state() {
     const live = Env.read(KEY, null);
@@ -66,7 +68,7 @@ const Presets = (() => {
     const list = names.length
       ? `<span class="o-row-ctl">
           <select data-preset-pick aria-label="My presets">${names.map((n) =>
-            `<option value="${Fmt.esc(n)}"${n === picked ? " selected" : ""}>${Fmt.esc(n)}</option>`).join("")}</select>
+            `<option value="${attr(n)}"${n === picked ? " selected" : ""}>${Fmt.esc(n)}</option>`).join("")}</select>
           <button type="button" class="o-btn" data-preset="load">Load</button>
           <button type="button" class="o-btn" data-preset="delete">${armed === picked ? "Confirm delete" : "Delete"}</button>
         </span>`
@@ -75,7 +77,7 @@ const Presets = (() => {
       ${active}
       <div class="o-row"><span class="o-row-text"><span class="o-row-label">Save preset</span></span>
         <span class="o-row-ctl">
-          <input type="text" data-preset-name maxlength="${NAME_MAX}" value="${Fmt.esc(name)}"
+          <input type="text" data-preset-name maxlength="${NAME_MAX}" value="${attr(name)}"
             placeholder="Preset name" aria-label="Preset name">
           <button type="button" class="o-btn" data-preset="save"${m.off ? " disabled" : ""}>${m.label}</button>
         </span></div>
