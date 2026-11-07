@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.6-fork.16
+// @version      2.6.7-fork.16
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.6 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
+// @description  Fork de Torn Oracle: Travel 2.6.7 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -356,12 +356,19 @@ const Settings = (() => {
       label: "Travel method",
       help: "Sets your flight times." },
     { name: "capacity", group: "trips", kind: "int", def: 28, min: 1, max: 500, sync: "capacity",
+      auto: "capacity_from_page",
       label: "Suitcase size",
       help: "Items you carry per flight." },
 
+    { name: "capacity_from_page", group: "trips", kind: "bool", def: true, hidden: true,
+      label: "Automatic" },
+
     { name: "extra_slots", group: "trips", kind: "int", def: 0, min: 0, max: 50,
+      auto: "extra_slots_from_page",
       label: "Company extra slots",
-      help: "Slots your job adds for flowers or plushies only. Read from the travel agency." },
+      help: "Slots your job adds for flowers or plushies only." },
+    { name: "extra_slots_from_page", group: "trips", kind: "bool", def: true, hidden: true,
+      label: "Automatic" },
     { name: "extra_type", group: "trips", kind: "choice", def: "Flower",
       choices: () => [["Flower", "Flowers"], ["Plushie", "Plushies"]],
       showIf: () => Settings.get("extra_slots") > 0,
@@ -697,7 +704,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.6";
+  const SCRIPT_VERSION = "2.6.7";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -4544,10 +4551,22 @@ const Style = (() => {
   border-bottom: 1px solid var(--o-line); font-size: 12px;
 }
 #oracle-panel .o-choice-runs li:last-child { border-bottom: 0; }
-#oracle-panel tr.o-cat td {
-  padding: 8px 8px 4px; font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .05em; color: var(--o-faint);
+#oracle-panel tr.o-cat td { padding: 0; background: var(--o-bg-sunk); border-top: 2px solid var(--o-line); }
+#oracle-panel button.o-cat-btn {
+  appearance: none; display: flex; align-items: baseline; gap: 8px; width: 100%;
+  padding: 8px 10px; border: 0; background: transparent; cursor: pointer; text-align: left;
+  font: inherit; color: var(--o-text); box-shadow: inset 3px 0 0 var(--o-accent);
 }
+#oracle-panel button.o-cat-btn:hover { background: var(--o-accent-soft); }
+#oracle-panel .o-cat-name { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+#oracle-panel .o-cat-count { font-size: 11px; color: var(--o-dim); }
+#oracle-panel button.o-cat-btn::after {
+  content: ""; flex: 0 0 auto; align-self: center; width: 6px; height: 6px; margin: 0 3px 0 auto;
+  border-right: 2px solid var(--o-dim); border-bottom: 2px solid var(--o-dim);
+  transform: rotate(45deg); transition: transform .15s;
+}
+#oracle-panel tr.o-cat.is-folded button.o-cat-btn::after { transform: rotate(-45deg); }
+#oracle-panel tr.o-cat.is-folded button.o-cat-btn { box-shadow: inset 3px 0 0 var(--o-line); }
 #oracle-panel tr.leg-done td:first-child { box-shadow: inset 3px 0 0 var(--o-go); }
 #oracle-panel tr.leg-live td:first-child { box-shadow: inset 3px 0 0 var(--o-accent); }
 #oracle-panel tr.leg-late td:first-child { box-shadow: inset 3px 0 0 var(--o-warn); }
@@ -4672,6 +4691,8 @@ const Style = (() => {
 #oracle-panel .o-row-label { display: block; font-size: 12px; font-weight: 500; color: var(--o-text); }
 #oracle-panel .o-row-help { display: block; font-size: 11px; color: var(--o-faint); margin-top: 1px; }
 #oracle-panel .o-row-ctl { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+#oracle-panel .o-auto { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--o-dim); cursor: pointer; }
+#oracle-panel input[type=number]:disabled { opacity: .45; cursor: not-allowed; }
 #oracle-panel .o-unit { display: inline-flex; align-items: center; gap: 4px; color: var(--o-faint); font-size: 11px; }
 #oracle-panel .o-unit input { width: 6.5em; text-align: right; }
 #oracle-panel .o-unit input.o-money { width: 9em; }
@@ -6207,6 +6228,9 @@ const ViewShops = (() => {
   "use strict";
 
   const ROW_CAP = 14;
+  const SHOP_EVERY_MS = 15_000;
+
+  const FORECAST_EVERY_MS = 60_000;
 
   let country = null;
 
@@ -6217,6 +6241,9 @@ const ViewShops = (() => {
   let forecastError = null;
   let expanded = false;
   let sortKey = "margin";
+
+  const FOLD_KEY = "shop_folded";
+  const folded = new Set(Env.read(FOLD_KEY, []));
 
   let pendingReload = false;
 
@@ -6262,33 +6289,36 @@ const ViewShops = (() => {
     if (loading) { pendingReload = true; return; }
     const landAt = landingFor(code);
     const aim = Settings.aimAtRestock();
-    if (!force && data && data.code === code && data.landAt === landAt && data.aim === aim
-        && Date.now() - data.at < 45_000) return;
+    const same = data && data.code === code && data.landAt === landAt && data.aim === aim;
+    if (!force && same && Date.now() - data.at < SHOP_EVERY_MS - 3_000) return;
+    const reuse = !force && same && !forecastError
+      && Date.now() - data.forecastAt < FORECAST_EVERY_MS;
     loading = true;
     error = null;
     Panel.refresh("shops");
     try {
       const shop = await Oracle.shop(code);
-      let forecasts = {};
-      let reasons = {};
-      let restocks = {};
-      let horizonHours = null;
-      let atLanding = {};
-      forecastError = null;
-      try {
-        const batch = await Oracle.forecasts(code, { travel: Settings.get("travel_type"), landAt });
-        forecasts = batch.forecasts || {};
-        reasons = batch.reasons || {};
-        restocks = batch.restocks || {};
-        horizonHours = batch.horizon_hours;
-        atLanding = batch.at_landing || {};
-      } catch (err) {
+      let model = reuse ? data.model : null;
+      if (!model) {
+        model = { forecasts: {}, reasons: {}, restocks: {}, horizonHours: null, atLanding: {} };
+        forecastError = null;
+        try {
+          const batch = await Oracle.forecasts(code, { travel: Settings.get("travel_type"), landAt });
+          model = {
+            forecasts: batch.forecasts || {},
+            reasons: batch.reasons || {},
+            restocks: batch.restocks || {},
+            horizonHours: batch.horizon_hours,
+            atLanding: batch.at_landing || {},
+          };
+        } catch (err) {
 
-        forecastError = err.message;
-        Env.log.warn("forecasts failed", err.code || "");
+          forecastError = err.message;
+          Env.log.warn("forecasts failed", err.code || "");
+        }
       }
-      data = { code, shop, forecasts, reasons, restocks, horizonHours, atLanding, landAt, aim,
-               at: Date.now() };
+      data = { code, shop, model, ...model, landAt, aim, at: Date.now(),
+               forecastAt: reuse ? data.forecastAt : Date.now() };
     } catch (err) {
       error = err.message;
     } finally {
@@ -6364,8 +6394,17 @@ const ViewShops = (() => {
     return `<div class="o-note is-warn">${Fmt.esc(forecastError)}</div>`;
   }
 
+  function liveRows() {
+    const shop = StockShare.live();
+    return shop && shop.code === data.code ? new Map(shop.rows.map((r) => [r.id, r])) : null;
+  }
+
   function table() {
-    const items = data.shop.items.slice();
+    const live = liveRows();
+    const items = data.shop.items.map((i) => {
+      const row = live && live.get(i.item_id);
+      return row ? { ...i, quantity: row.stock, cost: row.price || i.cost } : i;
+    });
     const scored = items.map((i) => {
       const f = data.forecasts[String(i.item_id)] || null;
       return { item: i, f, margin: margin(i), restock: restockAt(i) };
@@ -6405,15 +6444,23 @@ const ViewShops = (() => {
     });
 
     const shown = expanded || grouped ? scored : scored.slice(0, ROW_CAP);
+    const cats = {};
+    if (grouped) {
+      for (const { item } of scored) {
+        const c = cats[item.type || ""] = cats[item.type || ""] || { n: 0, stocked: 0 };
+        c.n += 1;
+        if ((item.quantity || 0) > 0) c.stocked += 1;
+      }
+    }
     const seen = seenAt();
     const columns = data.landAt ? 7 : 8;
     let lastType;
 
     const rows = shown.map(({ item, f, margin: m, restock }) => {
-      const head = grouped && item.type !== lastType
-        ? `<tr class="o-cat"><td colspan="${columns}">${Fmt.esc(item.type || "No category")}</td></tr>`
-        : "";
-      lastType = item.type;
+      const cat = item.type || "";
+      const head = grouped && cat !== lastType ? catHead(cat, cats[cat], columns) : "";
+      lastType = cat;
+      if (grouped && folded.has(cat)) return head;
       const qty = item.quantity || 0;
       const cap = Settings.get("capacity")
         + (item.type === Settings.get("extra_type") ? Settings.get("extra_slots") : 0);
@@ -6481,6 +6528,17 @@ const ViewShops = (() => {
       <tbody>${rows.join("")}</tbody></table></div>${more}`;
   }
 
+  function catHead(cat, c, columns) {
+    const open = !folded.has(cat);
+    const stock = c.stocked ? c.stocked + " in stock" : "none in stock";
+    return `<tr class="o-cat${open ? "" : " is-folded"}"><td colspan="${columns}">
+      <button type="button" class="o-cat-btn" data-act="fold" data-cat="${encodeURIComponent(cat)}"
+        aria-expanded="${open}">
+        <span class="o-cat-name">${Fmt.esc(cat || "No category")}</span>
+        <span class="o-cat-count">${Fmt.esc(Fmt.plural(c.n, "item"))} · ${Fmt.esc(stock)}</span>
+      </button></td></tr>`;
+  }
+
   function restockAt(item) {
     const band = data.restocks[String(item.item_id)];
     const src = (band && (band.from || band.p50)) || item.restock_at;
@@ -6508,11 +6566,13 @@ const ViewShops = (() => {
   }
 
   function seenAt() {
+    if (liveRows()) return Date.now();
     const at = data.shop.observed_at ? Date.parse(data.shop.observed_at) : NaN;
     return isNaN(at) ? null : at;
   }
 
   function footer() {
+    if (liveRows()) return `<div class="o-note">Stock and prices are live from this page.</div>`;
     const seen = seenAt();
     const src = data.shop.source ? " · via " + data.shop.source : "";
     if (seen === null) {
@@ -6543,12 +6603,20 @@ const ViewShops = (() => {
   function wireBody(body) {
     const expand = body.querySelector('[data-act="expand"]');
     if (expand) expand.addEventListener("click", () => { expanded = !expanded; Panel.refresh("shops"); });
+    for (const btn of body.querySelectorAll('[data-act="fold"]')) {
+      btn.addEventListener("click", () => {
+        const cat = decodeURIComponent(btn.dataset.cat);
+        if (!folded.delete(cat)) folded.add(cat);
+        Env.write(FOLD_KEY, [...folded]);
+        Panel.refresh("shops");
+      });
+    }
   }
 
   return {
     id: "shops", label: "Shops", render, tick: Fmt.tickLive, load, follow,
     badge: () => null,
-    refresh: (force) => load(force), refreshEvery: 60_000,
+    refresh: (force) => load(force), refreshEvery: SHOP_EVERY_MS,
   };
 })();
 
@@ -7409,14 +7477,18 @@ const ViewSettings = (() => {
             data-set="${r.name}" value="${Fmt.esc(Number(v).toLocaleString("en-US"))}"
             aria-label="${Fmt.esc(r.label)}"></span>`;
         }
+        const auto = r.auto && Settings.get("follow_page");
+        const locked = auto && Settings.get(r.auto);
         const input = `<input type="number" data-set="${r.name}" value="${Fmt.esc(v)}"
           aria-label="${Fmt.esc(r.label)}"
           ${r.min !== undefined ? `min="${r.min}"` : ""}
           ${r.max !== undefined ? `max="${r.max}"` : ""}
-          ${r.step ? `step="${r.step}"` : ""}>`;
+          ${r.step ? `step="${r.step}"` : ""}${locked ? " disabled" : ""}>`;
         const pre = r.unit === "$" ? "$" : "";
         const post = r.unit && r.unit !== "$" ? r.unit : "";
-        return `<span class="o-unit">${pre}${input}${post}</span>`;
+        const box = auto ? `<label class="o-auto"><input type="checkbox" data-set="${r.auto}"
+          ${locked ? " checked" : ""}>Automatic</label>` : "";
+        return `${box}<span class="o-unit">${pre}${input}${post}</span>`;
       }
       case "choice":
         return `<select data-set="${r.name}" aria-label="${Fmt.esc(r.label)}">${r.choices().map(([val, lab]) =>
@@ -8991,10 +9063,13 @@ const StockShare = (() => {
   "use strict";
 
   const GAP_MS = 5000;
+  const CONFIRM_MS = 15000;
 
   let lastKey = "";
   let lastAt = 0;
   let timer = null;
+  let confirmTimer = null;
+  let liveKey = "";
 
   function focused() {
     try { return Env.visible() && document.hasFocus(); } catch (e) { return false; }
@@ -9011,34 +9086,53 @@ const StockShare = (() => {
     return Settings.get("share_stock") && Oracle.haveToken();
   }
 
+  function keyOf(code, rows) {
+    return code + "|" + rows.map((r) => r.id + ":" + r.stock + ":" + r.price).join(",");
+  }
+
+  function live() {
+    if (Page.mode() !== "abroad" || !focused()) return null;
+    const code = shopCountry();
+    const rows = Page.shopRows();
+    return code && rows.length ? { code, rows } : null;
+  }
+
   function offer() {
-    if (timer || !enabled() || !focused()) return;
-    const wait = lastAt + GAP_MS - Date.now();
-    if (wait > 0) {
-      timer = setTimeout(() => { timer = null; send(); }, wait);
-      return;
+    const shop = live();
+    const key = shop ? keyOf(shop.code, shop.rows) : "";
+    if (key !== liveKey) {
+      liveKey = key;
+      Bus.emit("shop:live");
     }
-    send();
+    if (!shop || !enabled()) return;
+    if (!timer) {
+      const wait = lastAt + GAP_MS - Date.now();
+      if (wait > 0) timer = setTimeout(() => { timer = null; send(); }, wait);
+      else send();
+    }
+    if (!confirmTimer) {
+      const wait = Math.max(0, lastAt + CONFIRM_MS - Date.now());
+      confirmTimer = setTimeout(() => { confirmTimer = null; offer(); }, wait);
+    }
   }
 
   function send() {
-    if (!enabled() || !focused() || Page.mode() !== "abroad") return;
-    const code = shopCountry();
-    const rows = Page.shopRows();
-    if (!code || !rows.length) return;
-    const key = code + "|" + rows.map((r) => r.id + ":" + r.stock + ":" + r.price).join(",");
-    if (key === lastKey) return;
+    if (!enabled()) return;
+    const shop = live();
+    if (!shop) return;
+    const key = keyOf(shop.code, shop.rows);
     const readAt = Date.now();
+    if (key === lastKey && readAt - lastAt < CONFIRM_MS) return;
     lastKey = key;
     lastAt = readAt;
     Oracle.shareStock({
-      country: code,
+      country: shop.code,
       age_ms: Date.now() - readAt,
-      items: rows.map((r) => ({ id: r.id, quantity: r.stock, cost: r.price || null })),
+      items: shop.rows.map((r) => ({ id: r.id, quantity: r.stock, cost: r.price || null })),
     }).catch((err) => Env.log.warn("stock share failed", err.message));
   }
 
-  return { offer };
+  return { offer, live };
 })();
 
 // Fork : alerte d'export. Prix le plus bas à Torn (item market et bazaars) comparé au prix de rachat
@@ -9549,12 +9643,16 @@ Env.ready().then(function boot() {
         if (kept === null || read !== inventoryReads) return;
         const free = Math.max(1, value.slots - kept);
         let moved = false;
-        if (Settings.get("capacity") !== free) moved = Settings.set("capacity", free) || moved;
-        if (Settings.get("extra_slots") !== value.special) {
-          moved = Settings.set("extra_slots", value.special) || moved;
+        if (Settings.get("capacity_from_page") && Settings.get("capacity") !== free) {
+          moved = Settings.set("capacity", free) || moved;
         }
-        if (value.specialType && Settings.get("extra_type") !== value.specialType) {
-          moved = Settings.set("extra_type", value.specialType) || moved;
+        if (Settings.get("extra_slots_from_page")) {
+          if (Settings.get("extra_slots") !== value.special) {
+            moved = Settings.set("extra_slots", value.special) || moved;
+          }
+          if (value.specialType && Settings.get("extra_type") !== value.specialType) {
+            moved = Settings.set("extra_type", value.specialType) || moved;
+          }
         }
         if (moved) Panel.refresh();
       });
@@ -9588,6 +9686,7 @@ Env.ready().then(function boot() {
     Panel.refresh();
   });
 
+  Bus.on("shop:live", () => Panel.refresh("shops"));
   Bus.on("plan:start", () => Panel.flash(null, null, "today"));
   Bus.on("plan:stage", () => Panel.refresh("today"));
 
