@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.7-fork.16
+// @version      2.6.8-fork.16
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.7 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
+// @description  Fork de Torn Oracle: Travel 2.6.8 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -704,7 +704,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.7";
+  const SCRIPT_VERSION = "2.6.8";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -4293,6 +4293,14 @@ const Page = (() => {
     return inv ? [inv.slots, inv.special, inv.specialType, inv.packed, inv.items.join("|")].join("/") : "";
   }
 
+  function rowPrice(row) {
+    for (const sel of ['[class*="neededSpace"]', '[class*="displayPrice"]']) {
+      const text = row.querySelector(sel)?.textContent.trim() || "";
+      if (/^\$[\d,]+$/.test(text)) return Number(text.replace(/\D/g, ""));
+    }
+    return null;
+  }
+
   function shopRows() {
     const out = [];
     for (const form of document.querySelectorAll('#travel-root form[id^="item-"][id$="-form"]')) {
@@ -4306,10 +4314,8 @@ const Page = (() => {
         stock = Number(label.parentElement.textContent.replace(/\D/g, ""));
         break;
       }
-      const priceEl = row.querySelector('[class*="displayPrice"]');
-      const price = priceEl ? Number(priceEl.textContent.replace(/\D/g, "")) : null;
       if (stock === null || !isFinite(stock)) continue;
-      out.push({ id, name: nameEl ? nameEl.textContent.trim() : "", stock, price });
+      out.push({ id, name: nameEl ? nameEl.textContent.trim() : "", stock, price: rowPrice(row) });
     }
     return out;
   }
