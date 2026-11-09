@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.8-fork.17
+// @version      2.6.8-fork.18
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.8 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -9607,11 +9607,14 @@ const AutoTrack = (() => {
     Panel.refresh("assist", true);
   }
 
-  async function fill(code, planned) {
+  async function fill(code, planned, manual) {
     Panel.flash("", "", "assist");
     Settings.set("assist_track", []);
     show();
-    if (planned && Settings.get("assist_kit").hosp) return;
+    if (planned && Settings.get("assist_kit").hosp) {
+      if (manual) Panel.flash("Self-hosp planned: tracking the plan's item only.", "", "assist");
+      return;
+    }
     try {
       const shop = await Oracle.shop(code);
       Settings.set("assist_track", profitable(shop.items || []));
@@ -9637,7 +9640,7 @@ const AutoTrack = (() => {
   function manual() {
     const { leg, code } = target();
     if (!code) { Panel.flash("Pick a destination first.", "warn", "assist"); return undefined; }
-    return fill(code, !!leg && !leg.runtime.flewTo && leg.country === code);
+    return fill(code, !!leg && !leg.runtime.flewTo && leg.country === code, true);
   }
 
   // Avertissement de cash : boutique relue au plus une fois par minute, onglet Assist affiché
@@ -9665,6 +9668,7 @@ const AutoTrack = (() => {
   }
 
   function warning(track) {
+    if (Trip.get().phase === "inbound") return "";
     const { code } = target();
     if (!code) return "";
     const known = cash && cash.code === code;

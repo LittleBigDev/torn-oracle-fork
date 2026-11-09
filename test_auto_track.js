@@ -14,7 +14,7 @@ async function run(ev, { country = "can", items = [], fail = false, hosp = null,
     Assist: { paint() {} },
     Panel: { refresh() {}, flash(text) { if (text) track.warned += 1; } },
     Env: { log: { warn() {} } },
-    Trip: { get: () => ({ country, active: !!leg }), currentLeg: () => leg },
+    Trip: { get: () => ({ country, active: !!leg, phase: track.phase }), currentLeg: () => leg },
     Page: { selectedDestination: () => selected },
     document: { getElementById: (id) => (id === "user-money" && wallet !== null ? { dataset: { money: String(wallet) } } : null) },
     Fmt: { esc: (s) => s, money: (n) => "$" + n },
@@ -36,6 +36,7 @@ const plain = (list) => JSON.parse(JSON.stringify(list));
   let t = await run({ leg: { item_name: "Dahlia" } }, { items: shop, hosp: kit });
   assert.deepEqual(plain(t.list), [], "plan avec self-hosp : liste vide");
   assert.equal(t.asked, null, "plan avec self-hosp : boutique non lue");
+  assert.equal(t.warned, 0, "décollage, plan avec self-hosp : pas de message");
 
   t = await run({ leg: { item_name: "Dahlia" } }, { items: shop });
   assert.deepEqual(plain(t.list), [{ id: 5, name: "High" }, { id: 3, name: "Low" }], "rentables, marge décroissante");
@@ -57,6 +58,7 @@ const plain = (list) => JSON.parse(JSON.stringify(list));
   const leg = { country: "can", runtime: {} };
   t = await run(null, { manual: true, items: shop, hosp: kit, leg, country: null });
   assert.deepEqual(plain(t.list), [], "bouton, à Torn, plan avec self-hosp : liste vide");
+  assert.equal(t.warned, 1, "bouton, plan avec self-hosp : message affiché");
 
   t = await run(null, { manual: true, items: shop, hosp: kit, leg, country: null, selected: "jap" });
   assert.equal(t.asked, "jap", "bouton : la destination choisie passe avant le plan");
@@ -89,6 +91,12 @@ const plain = (list) => JSON.parse(JSON.stringify(list));
   assert.equal(await warned(28000), "", "cash : assez d'argent, pas d'avertissement");
   assert.equal(await warned(null), "", "cash : montant absent de la page, pas d'avertissement");
   assert.ok((await warned(0)).includes("Rose"), "cash : 0 $ en main");
+
+  t = await run(null, { manual: true, items: priced, wallet: 0 });
+  t.auto.warning(refs);
+  await settle();
+  t.phase = "inbound";
+  assert.equal(t.auto.warning(refs), "", "cash : pas d'avertissement sur un vol de retour");
 
   console.log("ok");
 })().catch((e) => { console.error(e); process.exit(1); });
