@@ -18,6 +18,10 @@ The Shops tab has a **Sell** column showing that channel (Traders, Item market, 
 
 **Assist** tab, **Packed items to sell** list: items from "Other items to pack" to sell as soon as you land, before you self-hosp. While one of them is still in your suitcase, the button stays hidden during the flight, then offers "Sell <item>" once you land, one item after another in list order. Once everything is sold, the button goes back to its normal behavior (self-hosp, restock, buy, fly home).
 
+## Tracked items set at take-off
+
+When a flight to another country starts, the **Tracked items** list of the **Assist** tab is replaced by the destination's profitable items, best margin first (10 at most). On a planned flight with a self-hosp item set on the Assist tab, the list is simply emptied: Assist then waits for the plan's item. The **Auto track** button under the list does the same at any time (country of the current flight, else the destination selected on the page, else the plan's). A warning appears under the button when your cash can't buy a full bag of a tracked item.
+
 ## Presets
 
 **Settings** tab, **Presets** section: save your trip, buying, forecast and Assist settings (kit, tracked items, items to sell) under a name, then load them in one click. Your key, account, alerts, display and suitcase size are not included. With the active preset's name in the box, the button saves your changes to it; another name saves a new preset ("Replace" if that name already exists). "(modified)" shows when your settings no longer match the active preset. Presets are stored in this browser only.
@@ -53,6 +57,10 @@ Onglet **Export watch** : un objet, un pays, une marge minimale par unité. Tout
 ### Objets à vendre à l'arrivée
 
 Onglet **Assist**, liste **Packed items to sell** : des objets d'« Other items to pack » à vendre dès l'arrivée, avant le self-hosp. Tant qu'il en reste un dans la valise, le bouton ne s'affiche pas pendant le vol, puis propose « Sell <objet> » à l'arrivée, un objet après l'autre dans l'ordre de la liste. Une fois tout vendu, le bouton reprend son comportement normal (self-hosp, restock, achat, retour).
+
+### Tracked items réglés au décollage
+
+Au départ d'un vol vers l'étranger, la liste **Tracked items** de l'onglet **Assist** est remplacée par les objets rentables de la destination, meilleure marge d'abord (10 au maximum). Sur un vol du plan avec un objet de self-hosp réglé dans Assist, la liste est simplement vidée : Assist attend alors l'objet du plan. Le bouton **Auto track**, sous le titre de la liste, fait la même chose à tout moment (pays du vol en cours, sinon destination choisie sur la page, sinon celle du plan). Un avertissement s'affiche sous le bouton si ton argent en main ne permet pas d'acheter une valise pleine d'un objet suivi.
 
 ### Presets
 
