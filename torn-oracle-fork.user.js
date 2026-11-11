@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.8-fork.20
+// @version      2.6.8-fork.21
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.8 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -8792,7 +8792,7 @@ const ViewAssist = (() => {
                  value="${kit.meds}"></div>
       </div>
       <div class="o-group"><h4>Other items to pack</h4>
-        <div class="o-acts" style="margin-top:0"><button type="button" class="o-btn" data-act="follow-plan">Follow plan</button></div>
+        <div class="o-acts" style="margin-top:0"><button type="button" class="o-btn" data-act="follow-plan">Auto add</button></div>
         ${kit.extras.length ? `<div class="o-chips">${kit.extras.map((e) => `
           <span class="o-chip is-on">${Fmt.esc(e.name)} × ${e.n}
             <button type="button" class="o-link" data-unpack="${e.id}" aria-label="Remove">×</button>
