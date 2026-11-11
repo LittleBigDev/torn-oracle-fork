@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.8-fork.19
+// @version      2.6.8-fork.20
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.8 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -8792,6 +8792,7 @@ const ViewAssist = (() => {
                  value="${kit.meds}"></div>
       </div>
       <div class="o-group"><h4>Other items to pack</h4>
+        <div class="o-acts" style="margin-top:0"><button type="button" class="o-btn" data-act="follow-plan">Follow plan</button></div>
         ${kit.extras.length ? `<div class="o-chips">${kit.extras.map((e) => `
           <span class="o-chip is-on">${Fmt.esc(e.name)} × ${e.n}
             <button type="button" class="o-link" data-unpack="${e.id}" aria-label="Remove">×</button>
@@ -8868,6 +8869,22 @@ const ViewAssist = (() => {
     Panel.refresh("assist", true);
   }
 
+  function followPlan() {
+    const leg = Trip.get().active ? Trip.currentLeg() : null;
+    if (!leg) { tell("No active plan.", "warn"); return; }
+    const exp = ViewExports.bestFor(leg.country);
+    if (!exp) { tell("No export pays for " + Data.name(leg.country) + " right now (or exports still loading).", "warn"); return; }
+    const hit = find(exp.name, false);
+    if (!hit) { tell("No item is named " + exp.name + ".", "warn"); return; }
+    const n = Math.min(exp.units, Settings.MAX_EXTRA_COUNT);
+    const extras = Settings.get("assist_kit").extras.filter((e) => e.id !== hit.id);
+    if (extras.length >= Settings.MAX_EXTRAS) { tell("Remove an item to pack first.", "warn"); return; }
+    const sell = Settings.get("assist_sell");
+    if (!sell.some((r) => r.id === hit.id)) Settings.set("assist_sell", [...sell, { id: hit.id, name: hit.name }]);
+    setKit({ extras: [...extras, { id: hit.id, name: hit.name, n }] });
+    tell("Packing " + n + " x " + hit.name + " for " + Data.name(leg.country) + ".");
+  }
+
   function addSell(el) {
     const input = el.querySelector("[data-sell]");
     const name = input ? input.value.trim() : "";
@@ -8938,6 +8955,7 @@ const ViewAssist = (() => {
         if (btn.dataset.act === "auto-track") AutoTrack.manual();
         if (btn.dataset.act === "pack") addExtra(el);
         if (btn.dataset.act === "sell") addSell(el);
+        if (btn.dataset.act === "follow-plan") followPlan();
         if (btn.dataset.act === "retry") { error = null; loadCatalogue(); }
       });
     }
