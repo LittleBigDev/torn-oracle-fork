@@ -16,6 +16,8 @@ The Shops tab has a **Sell** column showing that channel (Traders, Item market, 
 
 ## Items to sell on arrival
 
+**Assist** tab: when the self-hosp or a med-out item can't be packed because none is left in your inventory, the error message links to that item on the item market.
+
 **Assist** tab, **Packed items to sell** list: items from "Other items to pack" to sell as soon as you land, before you self-hosp. While one of them is still in your suitcase, the button stays hidden during the flight, then offers "Sell <item>" once you land, one item after another in list order. Once everything is sold, the button goes back to its normal behavior (self-hosp, restock, buy, fly home).
 
 ## Tracked items set at take-off
@@ -55,6 +57,8 @@ L'onglet Shops a une colonne **Sell** qui indique ce canal (Traders, Item market
 Onglet **Export watch** : un objet, un pays, une marge minimale par unité. Toutes les minutes, tant qu'une page de Torn est ouverte, le fork compare le prix le plus bas à Torn (item market et bazaars, ces derniers via weav3r.dev) au prix de rachat du moment de la boutique étrangère (un Black Market rachète à son prix, les autres boutiques à 75 %). Au-dessus de la marge : bandeau en haut de n'importe quelle page de Torn, notification et bip. La marge totale porte sur la taille de valise moins le trip kit (objet de self-hosp, objets de med-out, autres objets). Code : `export_watch.js`, injecté dans le fork à la génération.
 
 ### Objets à vendre à l'arrivée
+
+Onglet **Assist** : quand l'objet de self-hosp ou de med-out ne peut pas être rangé dans la valise faute d'en avoir dans l'inventaire, le message d'erreur donne le lien vers cet objet sur l'item market.
 
 Onglet **Assist**, liste **Packed items to sell** : des objets d'« Other items to pack » à vendre dès l'arrivée, avant le self-hosp. Tant qu'il en reste un dans la valise, le bouton ne s'affiche pas pendant le vol, puis propose « Sell <objet> » à l'arrivée, un objet après l'autre dans l'ordre de la liste. Une fois tout vendu, le bouton reprend son comportement normal (self-hosp, restock, achat, retour).
 

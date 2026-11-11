@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.8-fork.18
+// @version      2.6.8-fork.19
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.8 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -8289,7 +8289,8 @@ const Assist = (() => {
     const list = found.data && Array.isArray(found.data.list) ? found.data.list : [];
     const named = list.filter((e) => e && e.name === ref.name && !e.disabled);
     const hit = named.find((e) => !e.faction) || named[0];
-    if (!hit) return { ok: false, message: "No " + ref.name + " in your inventory." };
+    if (!hit) return { ok: false, message: "No " + ref.name + " in your inventory.",
+                       link: "https://www.torn.com/page.php?sid=ItemMarket#/market/view=search&itemID=" + ref.id };
     const body = { itemID: hit.id };
     if (hit.armouryID) body.armouryID = hit.armouryID;
     if (hit.faction) body.factionItem = "1";
@@ -8523,7 +8524,7 @@ const Assist = (() => {
 
       markVisit({ medOut: false });
     }
-    message = res.message ? { text: res.message, tone: res.ok ? "" : "warn" } : null;
+    message = res.message ? { text: res.message, tone: res.ok ? "" : "warn", link: res.link || "" } : null;
     Env.log.event("assist " + step.act + (res.ok ? " ok" : " refused") + ": " + (res.message || ""));
     paint();
   }
@@ -8620,6 +8621,7 @@ const Assist = (() => {
       note: step.note || "",
       msg: message ? message.text : "",
       tone: message && message.tone ? " is-" + message.tone : "",
+      link: message && message.link ? message.link : "",
     } : null;
     const key = JSON.stringify(view);
     if (key === drawn) return;
@@ -8634,6 +8636,14 @@ const Assist = (() => {
     bar.querySelector(".oa-note").textContent = view.note;
     const msg = bar.querySelector(".oa-msg");
     msg.textContent = view.msg;
+    if (view.link) {
+      const a = document.createElement("a");
+      a.href = view.link;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = "Buy on the item market";
+      msg.append(" ", a);
+    }
     msg.className = "oa-msg" + view.tone;
   }
 
