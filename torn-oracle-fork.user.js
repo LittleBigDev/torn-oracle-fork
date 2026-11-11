@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.8-fork.21
+// @version      2.6.8-fork.23
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.8 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -5941,7 +5941,9 @@ const ViewToday = (() => {
         ? " · " + Fmt.esc(Fmt.hitPct(leg.hit)) + "% confidence" : "";
       const exp = rt.status === "pending" ? ViewExports.bestFor(leg.country) : null;
       const take = exp ? `<span class="o-sub">Take ${Fmt.esc(exp.units)} x ${Fmt.esc(exp.name)} `
-        + `<span class="go">+${Fmt.esc(Fmt.money(exp.profit))}</span></span>` : "";
+        + `<span class="go">+${Fmt.esc(Fmt.money(exp.profit))}</span>`
+        + ` <button type="button" class="o-link go" data-act="add-pack" data-code="${Fmt.esc(leg.country)}"`
+        + ` style="display:inline;margin:0;font-size:inherit;color:var(--o-go)">add to pack</button></span>` : "";
       const editable = rt.landedAt !== null;
 
       const landAt = rt.landedAt || (rt.status === "enroute" && rt.arrivalAt) || leg.land;
@@ -6143,6 +6145,7 @@ const ViewToday = (() => {
         else if (act === "choose") { Plan.choose(Number(btn.dataset.day)); Panel.refresh("today"); }
         else if (act === "stop") { Plan.stop(); Panel.refresh("today"); }
         else if (act === "settings") Panel.show("settings");
+        else if (act === "add-pack") { ViewAssist.followPlan(btn.dataset.code); Panel.show("assist"); }
         else if (act === "scope") ViewSettings.reveal("plan_countries");
         else if (act === "preselect") {
           if (!Page.preselect(btn.dataset.code)) {
@@ -8869,11 +8872,14 @@ const ViewAssist = (() => {
     Panel.refresh("assist", true);
   }
 
-  function followPlan() {
+  // code : pays d'une étape du plan (lien « add to pack » de l'onglet Plan), sinon prochaine étape
+  async function followPlan(code) {
     const leg = Trip.get().active ? Trip.currentLeg() : null;
-    if (!leg) { tell("No active plan.", "warn"); return; }
-    const exp = ViewExports.bestFor(leg.country);
-    if (!exp) { tell("No export pays for " + Data.name(leg.country) + " right now (or exports still loading).", "warn"); return; }
+    const country = code || (leg && leg.country);
+    if (!country) { tell("No active plan.", "warn"); return; }
+    const exp = ViewExports.bestFor(country);
+    if (!exp) { tell("No export pays for " + Data.name(country) + " right now (or exports still loading).", "warn"); return; }
+    if (!catalogue) await loadCatalogue();  // lien du Plan : onglet Assist pas encore ouvert
     const hit = find(exp.name, false);
     if (!hit) { tell("No item is named " + exp.name + ".", "warn"); return; }
     const n = Math.min(exp.units, Settings.MAX_EXTRA_COUNT);
@@ -8882,7 +8888,7 @@ const ViewAssist = (() => {
     const sell = Settings.get("assist_sell");
     if (!sell.some((r) => r.id === hit.id)) Settings.set("assist_sell", [...sell, { id: hit.id, name: hit.name }]);
     setKit({ extras: [...extras, { id: hit.id, name: hit.name, n }] });
-    tell("Packing " + n + " x " + hit.name + " for " + Data.name(leg.country) + ".");
+    tell("Packing " + n + " x " + hit.name + " for " + Data.name(country) + ".");
   }
 
   function addSell(el) {
@@ -8979,7 +8985,7 @@ const ViewAssist = (() => {
     }
   }
 
-  return { id: "assist", label: "Assist", render };
+  return { id: "assist", label: "Assist", render, followPlan };
 })();
 
 const News = (() => {
