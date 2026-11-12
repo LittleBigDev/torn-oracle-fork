@@ -12,7 +12,7 @@ The Shops tab has a **Sell** column showing that channel (Traders, Item market, 
 
 ## Export alert
 
-**Export watch** tab: one item, one country, a minimum margin per unit. Every minute, while a Torn page is open, the fork compares the lowest price in Torn (item market and bazaars, the latter through weav3r.dev) with the current buyback price of the foreign shop (a Black Market buys back at its own price, other shops at 75 %). Above the margin: a banner at the top of any Torn page, a notification and a beep. The total margin is based on your suitcase size minus the trip kit (self-hosp item, med-out items, other items). Click a value in the **Alert at** column to change it: Enter or the ✓ button saves it, same as adding the watch again with the new margin. Code: `export_watch.js`, injected into the fork at build time.
+**Export watch** tab: one item, one country, a minimum margin per unit. Every minute, while a Torn page is open, the fork compares the lowest price in Torn (item market and bazaars, the latter through weav3r.dev) with the current buyback price of the foreign shop (a Black Market buys back at its own price, other shops at 75 %). Above the margin: a banner at the top of any Torn page, a notification and a beep. The total margin is based on your suitcase size minus the trip kit (self-hosp item, med-out items, other items). Click a value in the **Alert at** column to change it: Enter or the ✓ button saves it, the watch keeps its place in the table. Code: `export_watch.js`, injected into the fork at build time.
 
 ## Items to sell on arrival
 
@@ -56,7 +56,7 @@ L'onglet Shops a une colonne **Sell** qui indique ce canal (Traders, Item market
 
 ### Alerte d'export
 
-Onglet **Export watch** : un objet, un pays, une marge minimale par unité. Toutes les minutes, tant qu'une page de Torn est ouverte, le fork compare le prix le plus bas à Torn (item market et bazaars, ces derniers via weav3r.dev) au prix de rachat du moment de la boutique étrangère (un Black Market rachète à son prix, les autres boutiques à 75 %). Au-dessus de la marge : bandeau en haut de n'importe quelle page de Torn, notification et bip. La marge totale porte sur la taille de valise moins le trip kit (objet de self-hosp, objets de med-out, autres objets). Un clic sur une valeur de la colonne **Alert at** permet de la modifier : Entrée ou le bouton ✓ l'enregistre, comme un nouvel ajout de la même surveillance avec la nouvelle marge. Code : `export_watch.js`, injecté dans le fork à la génération.
+Onglet **Export watch** : un objet, un pays, une marge minimale par unité. Toutes les minutes, tant qu'une page de Torn est ouverte, le fork compare le prix le plus bas à Torn (item market et bazaars, ces derniers via weav3r.dev) au prix de rachat du moment de la boutique étrangère (un Black Market rachète à son prix, les autres boutiques à 75 %). Au-dessus de la marge : bandeau en haut de n'importe quelle page de Torn, notification et bip. La marge totale porte sur la taille de valise moins le trip kit (objet de self-hosp, objets de med-out, autres objets). Un clic sur une valeur de la colonne **Alert at** permet de la modifier : Entrée ou le bouton ✓ l'enregistre, la ligne garde sa place dans le tableau. Code : `export_watch.js`, injecté dans le fork à la génération.
 
 ### Objets à vendre à l'arrivée
 

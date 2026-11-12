@@ -298,7 +298,11 @@ const ExportWatch = (() => {
         const w = list().find((x) => keyOf(x) === edit.key);
         if (input.value === "" || !(min >= 0)) return;
         edit = null;
-        if (w) save(Object.assign({}, w, { min }));
+        if (w) {
+          // Ligne gardée à sa place (un ajout la met en dernier)
+          Env.write(WATCHES, list().map((x) => keyOf(x) === keyOf(w) ? Object.assign({}, x, { min }) : x));
+          poll(true);
+        }
         Panel.refresh("exportwatch", true);
       };
       input.addEventListener("input", () => { edit.value = input.value; });
