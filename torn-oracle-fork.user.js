@@ -8887,8 +8887,12 @@ const ViewAssist = (() => {
     if (!catalogue) await loadCatalogue();  // lien du Plan : onglet Assist pas encore ouvert
     const hit = find(exp.name, false);
     if (!hit) { tell("No item is named " + exp.name + ".", "warn"); return; }
-    const n = Math.min(exp.units, Settings.MAX_EXTRA_COUNT);
-    const extras = Settings.get("assist_kit").extras.filter((e) => e.id !== hit.id);
+    const kit = Settings.get("assist_kit");
+    const extras = kit.extras.filter((e) => e.id !== hit.id);
+    // Places de la valise moins le reste du kit (self-hosp, med-out, autres objets)
+    const taken = (kit.hosp ? 1 : 0) + (kit.med ? kit.meds || 0 : 0) + extras.reduce((t, e) => t + e.n, 0);
+    const n = Math.min(exp.units, Settings.MAX_EXTRA_COUNT, Settings.get("capacity") - taken);
+    if (n <= 0) { tell("No room left in your suitcase for " + hit.name + ".", "warn"); return; }
     if (extras.length >= Settings.MAX_EXTRAS) { tell("Remove an item to pack first.", "warn"); return; }
     const sell = Settings.get("assist_sell");
     if (!sell.some((r) => r.id === hit.id)) Settings.set("assist_sell", [...sell, { id: hit.id, name: hit.name }]);
