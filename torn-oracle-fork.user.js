@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.9-fork.3
+// @version      2.6.9-fork.4
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.9 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -689,6 +689,14 @@ const Settings = (() => {
   const MAX_PRESETS = 12;
   const MAX_PRESET_NAME = 32;
   const presetRows = () => [...shareable(), ...SCHEMA.filter((r) => r.group === "assist")];
+  // Fork : preset en place et comparaison avec les réglages actuels
+  const CURRENT_PRESET_KEY = "fork_preset_current";
+  const currentPreset = () => Env.read(CURRENT_PRESET_KEY, "") || "";
+  function presetMatches(name) {
+    const blob = presets()[name];
+    return !!blob && presetRows().every((row) => !Object.prototype.hasOwnProperty.call(blob, row.name)
+      || JSON.stringify(get(row.name)) === JSON.stringify(blob[row.name]));
+  }
 
   function presets() {
     const live = Env.read(PRESETS_KEY, null) || Env.durable(PRESETS_KEY);
@@ -705,6 +713,7 @@ const Settings = (() => {
     if (!all[name] && Object.keys(all).length >= MAX_PRESETS) return false;
     all[name] = Object.fromEntries(presetRows().map((row) => [row.name, get(row.name)]));
     writePresets(all);
+    Env.write(CURRENT_PRESET_KEY, name);
     return true;
   }
 
@@ -717,6 +726,7 @@ const Settings = (() => {
         applied += 1;
       }
     }
+    Env.write(CURRENT_PRESET_KEY, name);
     return applied;
   }
 
@@ -726,6 +736,7 @@ const Settings = (() => {
     all[to] = all[name];
     delete all[name];
     writePresets(all);
+    if (currentPreset() === name) Env.write(CURRENT_PRESET_KEY, to);
     return true;
   }
 
@@ -733,6 +744,7 @@ const Settings = (() => {
     const all = presets();
     delete all[name];
     writePresets(all);
+    if (currentPreset() === name) Env.write(CURRENT_PRESET_KEY, "");
   }
 
   function aimAtRestock() {
@@ -749,7 +761,7 @@ const Settings = (() => {
     SCHEMA, BY_NAME, VERSION, MAX_MEDS, MAX_TRACKED, MAX_EXTRAS, MAX_EXTRA_COUNT,
     load, all, get, set, apply, sync, onChange, exportSafe, exportShared, importShared,
     planCountries, aimAtRestock,
-    MAX_PRESETS, MAX_PRESET_NAME, presets, savePreset, loadPreset, renamePreset, deletePreset,
+    MAX_PRESETS, MAX_PRESET_NAME, presets, savePreset, loadPreset, renamePreset, deletePreset, currentPreset, presetMatches,
     groups: () => ["account", "trips", "buying", "forecast", "alerts", "stock", "display"],
   };
 })();
@@ -7755,18 +7767,36 @@ const ViewSettings = (() => {
       </div>`);
   }
 
-  function presetsBlock() {
+  // Fork : liste redessinée à chaque changement de réglage (preset en place, changements non enregistrés)
+  Settings.onChange(() => {
+    const box = document.querySelector("#oracle-panel [data-fork-presets]");
+    if (box) box.innerHTML = presetList();
+  });
+
+  function presetList() {
     const names = Object.keys(Settings.presets()).sort((a, b) => a.localeCompare(b));
-    const list = names.map((name) => `
+    const current = Settings.currentPreset();
+    return names.map((name) => {
+      const same = Settings.presetMatches(name), here = name === current;
+      const off = same ? " disabled" : "";
+      const state = here ? `<span class="o-row-help" style="color: var(${same ? "--o-go" : "--o-warn"})">${
+        same ? "In use" : "In use, changed since loaded or saved"}</span>`
+        : same ? '<span class="o-row-help">Same as your current settings</span>' : "";
+      return `
       <div class="o-row">
-        <span class="o-row-text"><span class="o-row-label">${Fmt.esc(name)}</span></span>
+        <span class="o-row-text"><span class="o-row-label"${here ? ' style="color: var(--o-accent)"' : ""}>${
+          here ? "● " : ""}${Fmt.esc(name)}</span>${state}</span>
         <span class="o-row-ctl">
-          <button type="button" class="o-btn" data-act="preset-load" data-name="${Fmt.esc(name)}">Load</button>
-          <button type="button" class="o-btn" data-act="preset-save" data-name="${Fmt.esc(name)}">Update</button>
+          <button type="button" class="o-btn" data-act="preset-load" data-name="${Fmt.esc(name)}"${off}>Load</button>
+          <button type="button" class="o-btn" data-act="preset-save" data-name="${Fmt.esc(name)}"${off}>Update</button>
           <button type="button" class="o-btn" data-act="preset-rename" data-name="${Fmt.esc(name)}">Rename</button>
           <button type="button" class="o-btn" data-act="preset-delete" data-name="${Fmt.esc(name)}">Delete</button>
         </span>
-      </div>`).join("");
+      </div>`;
+    }).join("");
+  }
+
+  function presetsBlock() {
     return section("presets", ...SECTIONS.presets, `
       <div class="o-row is-stack">
         <span class="o-row-text">
@@ -7778,7 +7808,7 @@ const ViewSettings = (() => {
                  placeholder="Preset name" aria-label="Preset name">
           <button type="button" class="o-btn" data-act="preset-save">Save</button>
         </div>
-      </div>${list}`);
+      </div><div data-fork-presets>${presetList()}</div>`);
   }
 
   const dot = (tone) => `<span class="o-acct-dot${tone ? " is-" + tone : ""}"></span>`;
