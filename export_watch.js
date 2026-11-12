@@ -208,6 +208,25 @@ const ExportWatch = (() => {
   }
 
   const form = { code: "can" };
+  // Seuil en cours de modification dans le tableau : { key, value } (gardé si le panneau se redessine)
+  let edit = null;
+
+  // Même effet qu'un ajout : remplace la surveillance du même couple objet + pays
+  function save(w) {
+    Env.write(WATCHES, list().filter((x) => keyOf(x) !== keyOf(w)).concat(w));
+    poll(true);
+  }
+
+  function minCell(w) {
+    const key = keyOf(w);
+    if (!edit || edit.key !== key) {
+      return `<td class="num"><button type="button" class="o-link" data-edit="${Fmt.esc(key)}" title="Change"
+        style="font-size:inherit;color:inherit">${Fmt.esc(Fmt.price(w.min))}</button></td>`;
+    }
+    return `<td class="num" style="white-space:nowrap"><input type="number" data-edit-min min="0" step="100"
+        value="${Fmt.esc(edit.value)}" style="width:6.5em"> <button type="button" class="o-link" data-edit-ok
+        title="Save" style="display:inline;font-size:inherit;color:var(--o-go)">&#10003;</button></td>`;
+  }
 
   function render(el) {
     if (!Torn.haveKey() || !Oracle.haveToken()) {
@@ -226,7 +245,7 @@ const ExportWatch = (() => {
            <td class="num"><span class="${r.margin >= w.min ? "go" : "muted"}">${r.margin >= 0 ? "+" : ""}${
              Fmt.esc(Fmt.price(r.margin))}</span><span class="o-sub">${Fmt.esc(Fmt.money(r.margin * units()))}</span></td>`;
       return `<tr><td>${Fmt.esc(w.name)}<span class="o-sub">${Fmt.esc(Data.name(w.code))}</span></td>${cells}
-        <td class="num">${Fmt.esc(Fmt.price(w.min))}</td>
+        ${minCell(w)}
         <td><button type="button" class="o-link" data-del="${Fmt.esc(keyOf(w))}" title="Stop watching">&times;</button></td></tr>`;
     }).join("");
     const items = shopItems[form.code] || [];
@@ -261,10 +280,31 @@ const ExportWatch = (() => {
       const sel = el.querySelector('[data-ew="id"]');
       const min = Number(el.querySelector('[data-ew="min"]').value);
       if (!sel.value || !(min >= 0)) return;
-      const w = { id: Number(sel.value), name: sel.selectedOptions[0].textContent, code: form.code, min };
-      Env.write(WATCHES, list().filter((x) => keyOf(x) !== keyOf(w)).concat(w));
-      poll(true);
+      save({ id: Number(sel.value), name: sel.selectedOptions[0].textContent, code: form.code, min });
     });
+    for (const b of el.querySelectorAll("[data-edit]")) {
+      b.addEventListener("click", () => {
+        const w = list().find((x) => keyOf(x) === b.dataset.edit);
+        edit = w ? { key: keyOf(w), value: String(w.min) } : null;
+        Panel.refresh("exportwatch", true);
+        const input = el.querySelector("[data-edit-min]");
+        if (input) { input.focus(); input.select(); }
+      });
+    }
+    const input = el.querySelector("[data-edit-min]");
+    if (input) {
+      const submit = () => {
+        const min = Number(input.value);
+        const w = list().find((x) => keyOf(x) === edit.key);
+        if (input.value === "" || !(min >= 0)) return;
+        edit = null;
+        if (w) save(Object.assign({}, w, { min }));
+        Panel.refresh("exportwatch", true);
+      };
+      input.addEventListener("input", () => { edit.value = input.value; });
+      input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
+      el.querySelector("[data-edit-ok]").addEventListener("click", submit);
+    }
     for (const b of el.querySelectorAll("[data-del]")) {
       b.addEventListener("click", () => {
         Env.write(WATCHES, list().filter((x) => keyOf(x) !== b.dataset.del));
