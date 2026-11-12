@@ -29,7 +29,7 @@ Torn Oracle's own **Track the best items** box (Assist tab) ranks items with the
 
 Torn Oracle has its own presets since 2.6.9 (**Settings** tab, **Presets** section). The fork's former presets are copied into them once, on the first start, if you have no native preset yet.
 
-The fork marks the preset in use (● and its name in the accent color, the last one loaded or saved) and says when your settings changed since. Load and Update are greyed out on any preset identical to your current settings, since they would change nothing.
+The fork marks the preset in use (● and its name in the accent color, the last one loaded or saved) and says when your settings changed since. Load and Update are greyed out on any preset identical to your current settings, since they would change nothing. While a preset is in use, Update is also greyed out on the other presets, so they can't be overwritten with its settings by mistake.
 
 ## Installation
 
@@ -74,7 +74,7 @@ La case native **Track the best items** (onglet Assist) classe les objets avec l
 
 Torn Oracle a ses propres presets depuis la 2.6.9 (onglet **Settings**, section **Presets**). Les anciens presets du fork y sont recopiés une fois, au premier lancement, s'il n'y a encore aucun preset natif.
 
-Le fork signale le preset en place (● et nom en couleur, le dernier chargé ou enregistré) et indique si tes réglages ont changé depuis. Load et Update sont grisés sur tout preset identique à tes réglages actuels, puisqu'ils ne changeraient rien.
+Le fork signale le preset en place (● et nom en couleur, le dernier chargé ou enregistré) et indique si tes réglages ont changé depuis. Load et Update sont grisés sur tout preset identique à tes réglages actuels, puisqu'ils ne changeraient rien. Tant qu'un preset est en place, Update est aussi grisé sur les autres presets, pour ne pas les écraser par erreur avec ses réglages.
 
 ### Installation
 

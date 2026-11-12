@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.9-fork.4
+// @version      2.6.9-fork.5
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.9 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -7779,6 +7779,8 @@ const ViewSettings = (() => {
     return names.map((name) => {
       const same = Settings.presetMatches(name), here = name === current;
       const off = same ? " disabled" : "";
+      // Update d'un autre preset que celui en place : écraserait ce preset avec les réglages d'un autre
+      const offUpdate = same || (current && !here) ? " disabled" : "";
       const state = here ? `<span class="o-row-help" style="color: var(${same ? "--o-go" : "--o-warn"})">${
         same ? "In use" : "In use, changed since loaded or saved"}</span>`
         : same ? '<span class="o-row-help">Same as your current settings</span>' : "";
@@ -7788,7 +7790,7 @@ const ViewSettings = (() => {
           here ? "● " : ""}${Fmt.esc(name)}</span>${state}</span>
         <span class="o-row-ctl">
           <button type="button" class="o-btn" data-act="preset-load" data-name="${Fmt.esc(name)}"${off}>Load</button>
-          <button type="button" class="o-btn" data-act="preset-save" data-name="${Fmt.esc(name)}"${off}>Update</button>
+          <button type="button" class="o-btn" data-act="preset-save" data-name="${Fmt.esc(name)}"${offUpdate}>Update</button>
           <button type="button" class="o-btn" data-act="preset-rename" data-name="${Fmt.esc(name)}">Rename</button>
           <button type="button" class="o-btn" data-act="preset-delete" data-name="${Fmt.esc(name)}">Delete</button>
         </span>
