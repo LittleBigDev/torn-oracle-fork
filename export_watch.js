@@ -217,6 +217,25 @@ const ExportWatch = (() => {
     poll(true);
   }
 
+  const DEFAULT_MIN = 5000;
+
+  // Export conseillé pour la prochaine étape du plan (onglet Plan : « Take N x <objet> »), marge par défaut
+  async function autoAdd() {
+    const tell = (text, tone) => Panel.flash(text, tone, "exportwatch");
+    const leg = Trip.get().active ? Trip.currentLeg() : null;
+    if (!leg) { tell("No active plan.", "warn"); return; }
+    const code = leg.country;
+    const exp = ViewExports.bestFor(code);
+    if (!exp) { tell("No export pays for " + Data.name(code) + " right now (or exports still loading).", "warn"); return; }
+    await loadShop(code);
+    const item = (shopItems[code] || []).find((i) => i.name === exp.name);
+    if (!item) { tell(exp.name + " not found in the " + Data.name(code) + " shop yet, try again.", "warn"); return; }
+    const w = { id: Number(item.item_id), name: item.name, code, min: DEFAULT_MIN };
+    if (list().some((x) => keyOf(x) === keyOf(w))) { tell(w.name + " in " + Data.name(code) + " is already watched.", "warn"); return; }
+    save(w);
+    tell("Watching " + w.name + " in " + Data.name(code) + ".");
+  }
+
   function minCell(w) {
     const key = keyOf(w);
     if (!edit || edit.key !== key) {
@@ -250,8 +269,10 @@ const ExportWatch = (() => {
     }).join("");
     const items = shopItems[form.code] || [];
     el.innerHTML = `
-      <label class="o-field"><input type="checkbox" data-ew="notify"${Env.read(NOTIFY, true) ? " checked" : ""}>
+      <div class="o-field"><label style="display:flex;align-items:center;gap:8px;flex:1 1 auto">
+        <input type="checkbox" data-ew="notify"${Env.read(NOTIFY, true) ? " checked" : ""}>
         Enable notifications</label>
+        <button type="button" class="o-btn" data-ew-auto title="Watch the export advised for the plan's next run">Auto add</button></div>
       ${lines ? `<div class="o-scroll"><table><thead><tr><th>Item</th><th class="num">Torn now</th>
         <th class="num">Shop pays</th><th class="num">Margin</th><th class="num">Alert at</th><th></th></tr></thead>
         <tbody>${lines}</tbody></table></div>` : '<div class="o-empty">No export watch yet.</div>'}
@@ -276,6 +297,7 @@ const ExportWatch = (() => {
       Env.write(NOTIFY, ev.target.checked);
       paint();
     });
+    el.querySelector("[data-ew-auto]").addEventListener("click", autoAdd);
     el.querySelector("[data-ew-add]").addEventListener("click", () => {
       const sel = el.querySelector('[data-ew="id"]');
       const min = Number(el.querySelector('[data-ew="min"]').value);
