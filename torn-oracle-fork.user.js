@@ -8414,6 +8414,7 @@ const Assist = (() => {
         const have = count(ref);
         if (have < n) {
           if (f.room !== null && f.room <= 0) {
+            if (have > 0) continue;
             return { label: "Your bag is full", note: "No room for " + ref.name + "." };
           }
           if (f.room !== null && f.room > 1 && n - have >= f.room) {
