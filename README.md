@@ -4,11 +4,10 @@
 
 Fork of **Torn Oracle: Travel** (author: Ruinbringer, license GPL-3.0-only, [Greasy Fork](https://greasyfork.org/en/scripts/590310-torn-oracle-travel)): wherever Torn Oracle shows a profit (plans, plan purchases, Shops, Watches, Museum), each item is sold through its best channel.
 
-- Wardogs traders: market value × the category rate (98, 95 or 90 %)
-- your bazaar: 1 $ under the cheapest bazaar, never under 97 % of market value (floor). Only the floor is counted, so the margin shown is the minimum you get
+- your bazaar: 1 $ under the cheapest bazaar, never under the Wardogs traders rate for the item's category + 2 points of market value (floor; e.g. 98 % rate, 100 % floor). Your bazaar therefore always beats the traders. Only the floor is counted, so the margin shown is the minimum you get
 - city: the shop's buyback price
 
-The Shops tab has a **Sell** column showing that channel (Traders, Bazaar, or the name of the shop that buys it back). The "Sell to" and "Sell under market" settings no longer have any effect.
+The Shops tab has a **Sell** column showing that channel (Bazaar or the name of the shop that buys it back). The "Sell to" and "Sell under market" settings no longer have any effect.
 
 ## Export alert
 
@@ -48,11 +47,10 @@ GPL-3.0-only, like the original (`LICENSE`).
 
 Fork de **Torn Oracle: Travel** (auteur : Ruinbringer, licence GPL-3.0-only, [Greasy Fork](https://greasyfork.org/en/scripts/590310-torn-oracle-travel)) : partout où Torn Oracle affiche un profit (plans, achats du plan, Shops, Watches, Museum), la vente se fait au meilleur canal de chaque objet.
 
-- traders Wardogs : market value × taux de la catégorie (98, 95 ou 90 %)
-- ton bazaar : 1 $ sous le bazaar le moins cher, jamais sous 97 % du market value (plancher). Seul le plancher est compté : la marge affichée est un minimum
+- ton bazaar : 1 $ sous le bazaar le moins cher, jamais sous le taux des traders Wardogs de la catégorie + 2 points du market value (plancher ; ex. taux 98 %, plancher 100 %). Ton bazaar bat donc toujours les traders. Seul le plancher est compté : la marge affichée est un minimum
 - ville : prix de rachat de la boutique
 
-L'onglet Shops a une colonne **Sell** qui indique ce canal (Traders, Bazaar ou le nom de la boutique qui rachète). Les réglages « Sell to » et « Sell under market » n'ont plus d'effet.
+L'onglet Shops a une colonne **Sell** qui indique ce canal (Bazaar ou le nom de la boutique qui rachète). Les réglages « Sell to » et « Sell under market » n'ont plus d'effet.
 
 ### Alerte d'export
 
