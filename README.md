@@ -18,6 +18,8 @@ The Shops tab has a **Sell** column showing that channel (Traders, Item market, 
 
 **Assist** tab: when the self-hosp or a med-out item can't be packed because none is left in your inventory, the error message links to that item on the item market.
 
+Travel agency, **Open bazaar** button left of TRAVEL: shown only when you own a bazaar that has items in it but is closed (Torn API). One click opens it, with the same single request as Torn's own button. Code: `bazaar_open.js`, injected into the fork at build time.
+
 **Assist** tab, **Fill** button: when an item still to pack needs at least as many units as you have free slots, the button becomes "Fill <item> (N slots)" and fills every free slot in one click, with the same single request as Torn's own FILL button.
 
 **Assist** tab, **Auto add** button under "Other items to pack": packs the export advised for the plan's next run (Plan tab, "Take N x item +profit"), N of them (at most your suitcase size minus the rest of the trip kit: self-hosp item, med-out items, other items), and adds it to "Packed items to sell" so Assist sells it when you land. An item packed for an earlier run stays in the kit until you remove it. On the **Plan** tab, the **add to pack** link next to "Take N x item +profit" does the same for that run's country and opens the Assist tab.
@@ -63,6 +65,8 @@ Onglet **Export watch** : un objet, un pays, une marge minimale par unité. Tout
 ### Objets à vendre à l'arrivée
 
 Onglet **Assist** : quand l'objet de self-hosp ou de med-out ne peut pas être rangé dans la valise faute d'en avoir dans l'inventaire, le message d'erreur donne le lien vers cet objet sur l'item market.
+
+Agence de voyage, bouton **Open bazaar** à gauche de TRAVEL : affiché seulement si tu as un bazaar avec des objets et qu'il est fermé (API Torn). Un clic l'ouvre, avec la même requête unique que le bouton de Torn. Code : `bazaar_open.js`, injecté dans le fork à la génération.
 
 Onglet **Assist**, bouton **Fill** : quand il reste à ranger au moins autant d'unités d'un objet que de places libres, le bouton devient « Fill <objet> (N slots) » et remplit toutes les places en un clic, avec la même requête unique que le bouton FILL de Torn.
 
