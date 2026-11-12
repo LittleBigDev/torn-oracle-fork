@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.8-fork.30
+// @version      2.6.9-fork
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.8 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
+// @description  Fork de Torn Oracle: Travel 2.6.9 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -38,7 +38,7 @@ const Env = (() => {
 
   const caps = {
 
-    notify: typeof GM_notification === "function",
+    notify: typeof GM_notification === "function" && !isPDA,
 
     xhr: hasGmXhr || hasPdaHttp,
     storage: typeof GM_getValue === "function" && typeof GM_setValue === "function",
@@ -187,7 +187,7 @@ const Env = (() => {
   };
 
   function toast(title, body, onclick) {
-    if (!caps.notify || isPDA) return false;
+    if (!caps.notify) return false;
     try {
       GM_notification({
         title: "Torn Oracle: " + title,
@@ -431,10 +431,14 @@ const Settings = (() => {
     { name: "alerts_on", group: "alerts", kind: "bool", def: true,
       label: "Browser notifications",
       help: "Board, landing and fly-home alerts on this device." },
+    { name: "restock_sound", group: "alerts", kind: "choice", def: "loud",
+      choices: () => [["off", "Off"], ["soft", "Soft"], ["loud", "Loud"]],
+      label: "Alert sound",
+      help: "Plays when your tracked items restock and when a Shops bell rings." },
     { name: "approach_alert_mins", group: "alerts", kind: "int", def: 5, min: 0, max: 60,
       unit: "min", sync: "approach_alert_mins",
       label: "Warn before landing",
-      help: "0 turns it off." },
+      help: "Abroad and back in Torn. 0 turns it off." },
     { name: "escort_on", group: "alerts", kind: "bool", def: false, sync: "escort_on",
       label: "Discord alerts with this tab closed" },
     { name: "post_plan", group: "alerts", kind: "bool", def: false, sync: "post_plan",
@@ -450,8 +454,11 @@ const Settings = (() => {
       label: "Trip kit" },
     { name: "assist_track", group: "assist", kind: "itemrefs", def: [], hidden: true,
       sync: "assist_track", label: "Tracked items" },
-    { name: "assist_sell", group: "assist", kind: "itemrefs", def: [], hidden: true,
-      label: "Packed items to sell" },
+
+    { name: "assist_auto_track", group: "assist", kind: "bool", def: false, hidden: true,
+      label: "Track the best items" },
+    { name: "assist_export", group: "assist", kind: "bool", def: false, hidden: true,
+      label: "Pack the best export" },
 
     { name: "collapsed", group: "display", kind: "bool", def: false, hidden: true,
       label: "Panel collapsed" },
@@ -460,8 +467,6 @@ const Settings = (() => {
     { name: "minimal", group: "display", kind: "bool", def: false,
       label: "Minimal view",
       help: "Shows only what you need to act." },
-    { name: "compact", group: "display", kind: "bool", def: false,
-      label: "Compact rows" },
     { name: "clock_24h", group: "display", kind: "bool", def: true,
       label: "24-hour clock" },
     { name: "follow_page", group: "display", kind: "bool", def: true,
@@ -680,6 +685,56 @@ const Settings = (() => {
     return { applied, skipped };
   }
 
+  const PRESETS_KEY = "presets";
+  const MAX_PRESETS = 12;
+  const MAX_PRESET_NAME = 32;
+  const presetRows = () => [...shareable(), ...SCHEMA.filter((r) => r.group === "assist")];
+
+  function presets() {
+    const live = Env.read(PRESETS_KEY, null) || Env.durable(PRESETS_KEY);
+    return live && typeof live === "object" && !Array.isArray(live) ? live : {};
+  }
+
+  function writePresets(all) {
+    Env.write(PRESETS_KEY, all);
+    Env.keep(PRESETS_KEY, all);
+  }
+
+  function savePreset(name) {
+    const all = presets();
+    if (!all[name] && Object.keys(all).length >= MAX_PRESETS) return false;
+    all[name] = Object.fromEntries(presetRows().map((row) => [row.name, get(row.name)]));
+    writePresets(all);
+    return true;
+  }
+
+  function loadPreset(name) {
+    const blob = presets()[name];
+    if (!blob || typeof blob !== "object") return null;
+    let applied = 0;
+    for (const row of presetRows()) {
+      if (Object.prototype.hasOwnProperty.call(blob, row.name) && set(row.name, blob[row.name])) {
+        applied += 1;
+      }
+    }
+    return applied;
+  }
+
+  function renamePreset(name, to) {
+    const all = presets();
+    if (!all[name] || all[to]) return false;
+    all[to] = all[name];
+    delete all[name];
+    writePresets(all);
+    return true;
+  }
+
+  function deletePreset(name) {
+    const all = presets();
+    delete all[name];
+    writePresets(all);
+  }
+
   function aimAtRestock() {
     const aim = get("landing_aim");
     return aim === "restock" || (aim === "auto" && !!get("assist_kit").hosp);
@@ -694,6 +749,7 @@ const Settings = (() => {
     SCHEMA, BY_NAME, VERSION, MAX_MEDS, MAX_TRACKED, MAX_EXTRAS, MAX_EXTRA_COUNT,
     load, all, get, set, apply, sync, onChange, exportSafe, exportShared, importShared,
     planCountries, aimAtRestock,
+    MAX_PRESETS, MAX_PRESET_NAME, presets, savePreset, loadPreset, renamePreset, deletePreset,
     groups: () => ["account", "trips", "buying", "forecast", "alerts", "stock", "display"],
   };
 })();
@@ -704,7 +760,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.8";
+  const SCRIPT_VERSION = "2.6.9";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -848,6 +904,9 @@ const Oracle = (() => {
   const itemStock = (itemId) =>
     get("/item/" + Number(itemId) + "/stock").then((r) => r.data);
 
+  const itemBazaar = (itemId) =>
+    get("/item/" + Number(itemId) + "/bazaar").then((r) => r.data);
+
   const dials = (q) => {
     q.set("floor", String(Settings.get("landing_floor") / 100));
     q.set("target", String(Settings.get("landing_target") / 100));
@@ -916,7 +975,7 @@ const Oracle = (() => {
   return {
     HOST, OracleError,
     haveToken, health, friendly,
-    me, countries, shop, itemStock, forecasts, board, exports, announcements,
+    me, countries, shop, itemStock, itemBazaar, forecasts, board, exports, announcements,
     watches, addWatch, removeWatch,
     tokensList, tokenCreate, tokenDelete,
     putTrip, clearTrip, heartbeat, shareStock,
@@ -2701,6 +2760,7 @@ const Alerts = (() => {
     late:      { title: "Still on the ground", prompt: true, escort: true },
     departed:  { title: "Departed",      prompt: false, escort: true },
     approach:  { title: "Nearly there",  prompt: false, escort: true },
+    nearhome:  { title: "Nearly home",   prompt: false },
     landed:    { title: "Landed",        prompt: false, escort: true },
     home:      { title: "Back in Torn",  prompt: false, escort: true },
     bought:    { title: "Bought",        prompt: false },
@@ -2929,11 +2989,15 @@ const Alerts = (() => {
     if (!mins || mins <= 0) return;
     const s = Trip.get();
     const i = Trip.currentIndex();
-    if (i < 0 || s.phase !== "outbound") return;
+    if (i < 0 || (s.phase !== "outbound" && s.phase !== "inbound")) return;
     const arrival = s.runtime[i].arrivalAt;
     if (!arrival) return;
     const left = arrival - now;
     if (left <= 0 || left > mins * 60_000) return;
+    if (s.phase === "inbound") {
+      fire("nearhome", i, Math.max(1, Math.round(left / 60_000)) + " minutes to Torn.");
+      return;
+    }
 
     const flew = s.runtime[i].flewTo;
     fire("approach", i,
@@ -4533,7 +4597,6 @@ const Style = (() => {
   padding: 6px 8px; border-bottom: 1px solid var(--o-line); white-space: nowrap;
 }
 #oracle-panel td { padding: 7px 8px; border-bottom: 1px solid var(--o-line); vertical-align: top; color: var(--o-text); }
-#oracle-panel.o-compact td { padding: 4px 8px; }
 #oracle-panel tbody tr:last-child td { border-bottom: 0; }
 #oracle-panel tfoot td { border-top: 1px solid var(--o-line); border-bottom: 0; font-size: 11px; color: var(--o-dim); }
 #oracle-panel td.num, #oracle-panel th.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -4804,6 +4867,17 @@ const Style = (() => {
   background: var(--o-bg-raise); text-align: center;
 }
 #oracle-panel .o-support { margin: 0; font-size: 10px; color: var(--o-faint); }
+#oracle-panel button.o-bell {
+  appearance: none; border: 0; background: none; padding: 0 2px; margin-right: 4px; cursor: pointer;
+  color: var(--o-faint); vertical-align: -2px; line-height: 0;
+}
+#oracle-panel button.o-bell svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; }
+#oracle-panel button.o-bell:hover { color: var(--o-accent); }
+#oracle-panel button.o-bell[aria-pressed=true] { color: var(--o-accent); }
+#oracle-panel button.o-bell[aria-pressed=true] svg { fill: currentColor; }
+#oracle-panel a.o-out { color: var(--o-accent); text-decoration: none; font-weight: 600; }
+#oracle-panel a.o-out:hover { text-decoration: underline; }
+#oracle-panel .o-group > h4 a.o-out { margin-left: 6px; text-transform: none; letter-spacing: 0; }
 #oracle-panel .o-support a { color: var(--o-accent); text-decoration: none; font-weight: 600; }
 #oracle-panel .o-support a:hover { text-decoration: underline; }
 
@@ -4914,8 +4988,16 @@ const Style = (() => {
 #oracle-assist .oa-line { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
 #oracle-assist .oa-brand { font-weight: 700; font-size: 11px; color: var(--oa-accent); }
 #oracle-assist .oa-note { font-size: 12px; color: var(--oa-dim); }
+#oracle-assist .oa-acts { display: flex; gap: 6px; }
+#oracle-assist button.oa-skip {
+  appearance: none; flex: none; min-height: 44px; padding: 0 12px; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 600; border-radius: 8px;
+  border: 1px solid var(--oa-line); background: transparent; color: var(--oa-dim);
+  touch-action: manipulation; user-select: none;
+}
+#oracle-assist button.oa-skip[hidden] { display: none; }
 #oracle-assist button.oa-go {
-  appearance: none; display: block; width: 100%; min-height: 44px; cursor: pointer;
+  appearance: none; display: block; flex: 1 1 auto; width: 100%; min-height: 44px; cursor: pointer;
   font: inherit; font-size: 15px; font-weight: 700; border-radius: 8px;
   border: 1px solid var(--oa-accent); background: var(--oa-accent); color: #fff;
   touch-action: manipulation; user-select: none;
@@ -5294,7 +5376,6 @@ const Panel = (() => {
   function applyTheme() {
     if (!root) return;
     root.classList.toggle("o-dark", Page.darkMode());
-    root.classList.toggle("o-compact", Settings.get("compact") === true);
     root.classList.toggle("o-minimal", Settings.get("minimal") === true);
   }
 
@@ -5941,9 +6022,7 @@ const ViewToday = (() => {
         ? " · " + Fmt.esc(Fmt.hitPct(leg.hit)) + "% confidence" : "";
       const exp = rt.status === "pending" ? ViewExports.bestFor(leg.country) : null;
       const take = exp ? `<span class="o-sub">Take ${Fmt.esc(exp.units)} x ${Fmt.esc(exp.name)} `
-        + `<span class="go">+${Fmt.esc(Fmt.money(exp.profit))}</span>`
-        + ` <button type="button" class="o-link go" data-act="add-pack" data-code="${Fmt.esc(leg.country)}"`
-        + ` style="display:inline;margin:0;font-size:inherit;color:var(--o-go)">add to pack</button></span>` : "";
+        + `<span class="go">+${Fmt.esc(Fmt.money(exp.profit))}</span></span>` : "";
       const editable = rt.landedAt !== null;
 
       const landAt = rt.landedAt || (rt.status === "enroute" && rt.arrivalAt) || leg.land;
@@ -6145,7 +6224,6 @@ const ViewToday = (() => {
         else if (act === "choose") { Plan.choose(Number(btn.dataset.day)); Panel.refresh("today"); }
         else if (act === "stop") { Plan.stop(); Panel.refresh("today"); }
         else if (act === "settings") Panel.show("settings");
-        else if (act === "add-pack") { ViewAssist.followPlan(btn.dataset.code); Panel.show("assist"); }
         else if (act === "scope") ViewSettings.reveal("plan_countries");
         else if (act === "preselect") {
           if (!Page.preselect(btn.dataset.code)) {
@@ -6253,6 +6331,32 @@ const ViewShops = (() => {
 
   const FOLD_KEY = "shop_folded";
   const folded = new Set(Env.read(FOLD_KEY, []));
+
+  const BELL_KEY = "shop_bells";
+  const BELL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>';
+  const bells = () => Env.read(BELL_KEY, null) || {};
+
+  function ringBells() {
+    const all = bells();
+    const due = Object.entries(all).filter(([, b]) => b.at - Date.now() <= 60_000);
+    if (!due.length) return;
+    for (const [key] of due) delete all[key];
+    Env.write(BELL_KEY, all);
+    for (const [key, b] of due) {
+      if (Date.now() - b.at > 10 * 60_000) continue;
+      const code = key.split(":")[0];
+      const text = "Time to leave for " + b.name + " in " + Data.name(code) + ".";
+      Assist.beep();
+      Env.toast("Time to leave", text, () => {
+        try { window.focus(); } catch (e) {  }
+        Page.preselect(code);
+      });
+      Panel.flash(text, "go", "shops");
+      Env.log.event("bell: " + text);
+    }
+    Panel.refresh("shops");
+  }
+  setInterval(ringBells, 5_000);
 
   let pendingReload = false;
 
@@ -6465,6 +6569,9 @@ const ViewShops = (() => {
     const columns = data.landAt ? 7 : 8;
     let lastType;
 
+    const armed = bells();
+    let moved = false;
+
     const rows = shown.map(({ item, f, margin: m, restock }) => {
       const cat = item.type || "";
       const head = grouped && cat !== lastType ? catHead(cat, cats[cat], columns) : "";
@@ -6495,6 +6602,15 @@ const ViewShops = (() => {
           + (mine.shelf ? `<span class="o-sub">${Fmt.esc(Fmt.count(mine.shelf))} on shelf</span>` : "")
         : '<span class="muted">—</span>';
       const board = departAt ? Fmt.board(departAt) : '<span class="muted">—</span>';
+      const key = data.code + ":" + item.item_id;
+      const on = !!armed[key];
+      if (on && departAt && armed[key].at !== departAt) { armed[key].at = departAt; moved = true; }
+      const bell = !data.landAt && (on || departAt > Date.now())
+        ? `<button type="button" class="o-bell" data-bell="${item.item_id}" data-at="${departAt || ""}"
+             data-name="${Fmt.esc(item.name)}" aria-pressed="${on}"
+             title="${on ? "Alert set for the Board time" : "Alert me when it is time to leave"}"
+             aria-label="Alert me when it is time to leave for ${Fmt.esc(item.name)}">${BELL_ICON}</button>`
+        : "";
       return `${head}<tr>
         <td>${Fmt.esc(item.name)}
           <span class="o-sub">${Fmt.esc(item.type || "—")}</span></td>
@@ -6510,9 +6626,11 @@ const ViewShops = (() => {
         <td class="num o-col-extra">${ppm === null ? '<span class="muted">—</span>'
             : `<span class="${ppm > 0 ? "go" : "muted"} money">${Fmt.esc(Fmt.price(ppm))}</span>`}</td>
         ${data.landAt ? ""
-          : `<td class="num"${boardTitle}>${board}</td><td class="num">${land}</td>`}
+          : `<td class="num"${boardTitle}>${bell}${board}</td><td class="num">${land}</td>`}
       </tr>`;
     });
+
+    if (moved) Env.write(BELL_KEY, armed);
 
     const more = !grouped && scored.length > ROW_CAP
       ? `<div class="o-acts"><button type="button" class="o-btn" data-act="expand">
@@ -6612,6 +6730,16 @@ const ViewShops = (() => {
   function wireBody(body) {
     const expand = body.querySelector('[data-act="expand"]');
     if (expand) expand.addEventListener("click", () => { expanded = !expanded; Panel.refresh("shops"); });
+    for (const btn of body.querySelectorAll("[data-bell]")) {
+      btn.addEventListener("click", () => {
+        const all = bells();
+        const key = data.code + ":" + btn.dataset.bell;
+        if (all[key]) delete all[key];
+        else all[key] = { name: btn.dataset.name, at: Number(btn.dataset.at) };
+        Env.write(BELL_KEY, all);
+        Panel.refresh("shops", true);
+      });
+    }
     for (const btn of body.querySelectorAll('[data-act="fold"]')) {
       btn.addEventListener("click", () => {
         const cat = decodeURIComponent(btn.dataset.cat);
@@ -7223,15 +7351,17 @@ const ViewItems = (() => {
       const entry = findEntry(list, q);
       if (!entry) throw new Error("Item not found.");
 
-      const [mkt, stock] = await Promise.allSettled([
+      const [mkt, stock, bazaar] = await Promise.allSettled([
         Torn.itemMarket(entry.id, LISTINGS),
         Oracle.haveToken() ? Oracle.itemStock(entry.id) : Promise.resolve(null),
+        Oracle.haveToken() ? Oracle.itemBazaar(entry.id) : Promise.resolve(null),
       ]);
       result = {
         entry,
         market: mkt.status === "fulfilled" ? mkt.value : null,
         stock: stock.status === "fulfilled" ? stock.value : null,
         stockError: stock.status === "rejected" ? stock.reason.message : null,
+        bazaar: bazaar.status === "fulfilled" ? bazaar.value : null,
       };
     } catch (err) {
       error = err.message;
@@ -7268,7 +7398,7 @@ const ViewItems = (() => {
     if (loading) body = `<div class="o-empty">Searching…</div>`;
     else if (error) body = `<div class="o-note is-warn">${Fmt.esc(error)}</div>`;
     else if (result) body = itemCard(result) + shelves(result) + listings(result);
-    else body = `<div class="o-empty">Search for an item to see market prices and foreign stock.</div>`;
+    else body = `<div class="o-empty">Search for an item to see its cheapest listings in Torn and its foreign stock.</div>`;
 
     el.innerHTML = head + body;
     wire(el);
@@ -7355,19 +7485,44 @@ const ViewItems = (() => {
     </div>`;
   }
 
+  const out = (href, text) =>
+    `<a class="o-out" href="${Fmt.esc(href)}" target="_blank" rel="noopener">${text}</a>`;
+
   function listings(r) {
+    const id = Number(r.entry.id);
+    const table = (cols, rows) => `<div class="o-scroll"><table>
+      <thead><tr>${cols}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+    const cells = (first, price, qty) => `<tr><td>${first}</td>
+      <td class="num money">${Fmt.esc(Fmt.price(price))}</td>
+      <td class="num">${Fmt.esc(Fmt.count(qty))}</td></tr>`;
+    const cols = (first) => `<th>${first}</th><th class="num">Price</th><th class="num">Amount</th>`;
+
+    let bazaars;
+    if (!Oracle.haveToken()) {
+      bazaars = `<div class="o-note">Sign in with a free account in Settings to see bazaar listings.</div>`;
+    } else if (!r.bazaar || !Array.isArray(r.bazaar.listings)) {
+      bazaars = `<div class="o-note is-warn">Bazaar listings are not available right now.</div>`;
+    } else if (!r.bazaar.listings.length) {
+      bazaars = `<div class="o-note">No bazaar lists this item.</div>`;
+    } else {
+      bazaars = table(cols("Seller"), r.bazaar.listings.map((l) => cells(
+        l.player_id
+          ? out("https://www.torn.com/bazaar.php?userId=" + Number(l.player_id),
+                Fmt.esc(l.player_name || "Player " + l.player_id))
+          : Fmt.esc(l.player_name || "Unknown"),
+        l.price, l.quantity)));
+    }
+
     const market = ((r.market && (r.market.itemmarket || r.market)) || {}).listings || [];
     const list = Array.isArray(market) ? market.slice(0, LISTINGS) : [];
-    const rows = list.length
-      ? list.map((l, n) => `<div class="o-field">
-          <span class="o-field-label">${n === 0 ? "Item market" : ""}</span>
-          <span class="money">${Fmt.esc(Fmt.price(l.price))}
-            <span class="o-sub" style="display:inline">x${Fmt.esc(l.amount || l.quantity || 1)}</span></span>
-        </div>`).join("")
-      : `<div class="o-field"><span class="o-field-label">Item market</span>
-          <span class="muted">No listings</span></div>`;
+    const marketRows = list.length
+      ? table(cols("Listing"), list.map((l, n) => cells("#" + (n + 1), l.price, l.amount || l.quantity || 1)))
+      : `<div class="o-note">${r.market ? "No item market listings." : "The item market could not be read."}</div>`;
+    const marketLink = out(
+      "https://www.torn.com/page.php?sid=ItemMarket#/market/view=search&itemID=" + id, "Open");
 
-    return `<div class="o-group"><h4>Cheapest in Torn</h4>${rows}</div>`;
+    return `<div class="o-group"><h4>Cheapest in bazaars</h4>${bazaars}</div>
+      <div class="o-group"><h4>Cheapest on the item market ${marketLink}</h4>${marketRows}</div>`;
   }
 
   function wire(el) {
@@ -7399,9 +7554,10 @@ const ViewSettings = (() => {
     buying: ["What to buy", "Countries, categories, price and profit"],
     forecast: ["Forecast", "How sure a landing must be"],
     alerts: ["Alerts", "Browser and Discord"],
-    stock: ["Shop stock", "What you share from foreign shops"],
-    display: ["Display", "Minimal view, spacing, clock"],
+    stock: ["Share live stock when you're abroad", "Stock and prices of the shop you are in"],
+    display: ["Display", "Minimal view, clock"],
     share: ["Share settings", "Copy your plan settings or paste someone else's"],
+    presets: ["Presets", "Save your settings under a name and switch between them"],
   };
 
   let openSections = null;
@@ -7429,10 +7585,8 @@ const ViewSettings = (() => {
 
   function render(el) {
     initSections();
-    el.innerHTML = Settings.groups().map(groupBlock).join("") + shareBlock() + Presets.block(section)
-      + diagnostics();
+    el.innerHTML = Settings.groups().map(groupBlock).join("") + shareBlock() + presetsBlock() + diagnostics();
     wire(el);
-    Presets.wire(el, tell);
     if (openSections.has("buying") && catalogue === null && !catalogueError) loadCatalogue();
   }
 
@@ -7601,6 +7755,32 @@ const ViewSettings = (() => {
           <button type="button" class="o-btn" data-act="share-import">Import</button>
         </span>
       </div>`);
+  }
+
+  function presetsBlock() {
+    const names = Object.keys(Settings.presets()).sort((a, b) => a.localeCompare(b));
+    const list = names.map((name) => `
+      <div class="o-row">
+        <span class="o-row-text"><span class="o-row-label">${Fmt.esc(name)}</span></span>
+        <span class="o-row-ctl">
+          <button type="button" class="o-btn" data-act="preset-load" data-name="${Fmt.esc(name)}">Load</button>
+          <button type="button" class="o-btn" data-act="preset-save" data-name="${Fmt.esc(name)}">Update</button>
+          <button type="button" class="o-btn" data-act="preset-rename" data-name="${Fmt.esc(name)}">Rename</button>
+          <button type="button" class="o-btn" data-act="preset-delete" data-name="${Fmt.esc(name)}">Delete</button>
+        </span>
+      </div>`).join("");
+    return section("presets", ...SECTIONS.presets, `
+      <div class="o-row is-stack">
+        <span class="o-row-text">
+          <span class="o-row-help">A preset holds your trips, what to buy and forecast settings and
+            your Assist tab. Presets stay on this device.</span>
+        </span>
+        <div class="o-keyform">
+          <input type="text" data-preset maxlength="${Settings.MAX_PRESET_NAME}"
+                 placeholder="Preset name" aria-label="Preset name">
+          <button type="button" class="o-btn" data-act="preset-save">Save</button>
+        </div>
+      </div>${list}`);
   }
 
   const dot = (tone) => `<span class="o-acct-dot${tone ? " is-" + tone : ""}"></span>`;
@@ -7967,6 +8147,43 @@ const ViewSettings = (() => {
         tell(msg, res.skipped ? "warn" : undefined);
         break;
       }
+      case "preset-save": {
+        const name = (btn.dataset.name || el.querySelector("[data-preset]").value || "").trim();
+        if (!name) { tell("Name the preset first.", "warn"); return; }
+        if (!Settings.savePreset(name)) {
+          tell("You can keep " + Settings.MAX_PRESETS + " presets. Delete one first.", "warn");
+          return;
+        }
+        Panel.refresh("settings", true);
+        tell("Saved " + name + ".");
+        break;
+      }
+      case "preset-load": {
+        if (Settings.loadPreset(btn.dataset.name) === null) return;
+        Assist.paint();
+        Panel.applyTheme();
+        Panel.refresh();
+        Panel.badges();
+        tell("Loaded " + btn.dataset.name + "." + (Trip.get().active ? " Re-plan to use it." : ""));
+        break;
+      }
+      case "preset-rename": {
+        const to = (window.prompt("New name", btn.dataset.name) || "").trim()
+          .slice(0, Settings.MAX_PRESET_NAME);
+        if (!to || to === btn.dataset.name) return;
+        if (!Settings.renamePreset(btn.dataset.name, to)) {
+          tell("A preset is already named " + to + ".", "warn");
+          return;
+        }
+        Panel.refresh("settings", true);
+        break;
+      }
+      case "preset-delete": {
+        if (!window.confirm("Delete the preset " + btn.dataset.name + "?")) return;
+        Settings.deletePreset(btn.dataset.name);
+        Panel.refresh("settings", true);
+        break;
+      }
       case "tokens-toggle":
         tokensOpen = !tokensOpen;
         if (tokensOpen && tokens === null) loadTokens();
@@ -8104,6 +8321,7 @@ const ViewExports = (() => {
     } finally {
       loading = false;
       Panel.refresh();
+      Assist.paint();
     }
   }
 
@@ -8118,7 +8336,7 @@ const ViewExports = (() => {
     const row = fillable().find((r) => r.country === country);
     if (!row) return null;
     const units = Settings.get("capacity");
-    return { name: row.name, units, profit: row.margin * units };
+    return { id: row.item_id, name: row.name, units, profit: row.margin * units };
   }
 
   function nextCountry() {
@@ -8196,6 +8414,7 @@ const Assist = (() => {
   let windows = { code: null, at: 0, bands: {} };
   let wasReady = false;
   let alerted = false;
+  const skipPack = new Set();
   let observer = null;
   let pending = null;
   const loadedAt = Date.now();
@@ -8287,36 +8506,51 @@ const Assist = (() => {
     return res;
   }
 
-  async function packItem(ref, fill) {
+  async function sellItem(ref) {
+    const read = await readSlots();
+    if (!slots) return read;
+    const held = slots.filter((s) => s && s.item && Number(s.item.ID) === ref.id
+                                     && s.item.isSellable !== false);
+    slots = null;
+    if (!held.length || held[0].item.sellValue === 0) {
+      return { ok: false, refused: true, message: "This shop does not buy " + ref.name + "." };
+    }
+    const res = await travelData("sellItem", {
+      method: "POST", body: { slotID: held[0].ID, amount: held.length },
+    });
+    return Object.assign(res, { refused: !res.ok && !!res.data });
+  }
+
+  async function owned(ref) {
     const found = await travelData("searchItem", { method: "POST", form: { q: ref.name } });
     const list = found.data && Array.isArray(found.data.list) ? found.data.list : [];
-    const named = list.filter((e) => e && e.name === ref.name && !e.disabled);
+    return list.filter((e) => e && e.name === ref.name && !e.disabled);
+  }
+
+  const missing = (ref) => ({ ok: false, refused: true, message: "No " + ref.name + " in your inventory.",
+    link: "https://www.torn.com/page.php?sid=ItemMarket#/market/view=search&itemID=" + ref.id });
+
+  async function packItem(ref, fill) {
+    const named = await owned(ref);
     const hit = named.find((e) => !e.faction) || named[0];
-    if (!hit) return { ok: false, message: "No " + ref.name + " in your inventory.",
-                       link: "https://www.torn.com/page.php?sid=ItemMarket#/market/view=search&itemID=" + ref.id };
+    if (!hit) return missing(ref);
     const body = { itemID: hit.id };
     if (hit.armouryID) body.armouryID = hit.armouryID;
     if (hit.faction) body.factionItem = "1";
     return travelData(fill ? "fillSlotItems" : "addSlotItem", { method: "POST", body });
   }
 
-  // Fork : vente à l'étranger (requête relevée le 03/11/2026 : step=sellItem, {slotID, amount}).
-  // Vend tout le slot ; s'il reste un slot du même objet, le bouton repropose la vente.
-  async function sellItem(ref) {
-    const read = await readSlots();
-    if (!slots) return read;
-    // Un slot par unité (ID distincts), sans champ quantité ; Torn vend amount unités à partir du premier slot (relevé le 03/11/2026)
-    const held = slots.filter((s) => s && s.item && Number(s.item.ID) === ref.id);
-    slots = null;
-    if (!held.length) return { ok: false, message: "No " + ref.name + " in your travel inventory." };
-    const slot = held[0];
-    const amount = held.length;
-    return travelData("sellItem", { method: "POST", body: { slotID: slot.ID, amount } });
+  async function fillItem(ref) {
+    const hit = (await owned(ref)).find((e) => !e.faction);
+    if (!hit) return missing(ref);
+    const res = await travelData("fillSlotItems", { method: "POST", body: { itemID: hit.id } });
+    return Object.assign(res, { refused: !res.ok && !!res.data });
   }
 
   const ACTIONS = {
-    sell: (d) => sellItem(d.ref),
     pack: (d) => packItem(d.ref, d.fill),
+    fill: (d) => fillItem(d.ref),
+    sell: (d) => sellItem(d.ref),
     use: (d) => useItem(d.ref),
     buy: (d) => travelData("buy", { query: "&itemID=" + d.ref.id + "&amount=" + d.amount }),
     fly: () => travelData("travelHome", { method: "POST" }),
@@ -8372,22 +8606,111 @@ const Assist = (() => {
     return Page.hospitalLayout();
   }
 
+  const BEST_KEY = "assist_best";
+  const BEST_MS = 30 * 60_000;
+  let bestTried = { code: null, at: 0 };
+
+  const bestOn = () => Settings.get("assist_auto_track");
+  const bestCode = () => (Page.mode() === "abroad" ? countryCode() : destination());
+
+  function best() {
+    const b = Env.read(BEST_KEY, null);
+    return b && Array.isArray(b.refs) ? b : null;
+  }
+
+  async function loadBest() {
+    const code = bestOn() ? bestCode() : null;
+    if (!code || !Oracle.haveToken()) return;
+    const have = best();
+    if (have && have.code === code && Date.now() - have.at < BEST_MS) return;
+    if (bestTried.code === code && Date.now() - bestTried.at < 60_000) return;
+    bestTried = { code, at: Date.now() };
+    try {
+      const shop = await Oracle.shop(code);
+      const sellTo = Settings.get("sell_to");
+      const refs = (shop.items || [])
+        .map((it) => ({ ref: { id: it.item_id, name: it.name },
+                        gain: Data.margin(it.market_value, it.sell_price, it.cost, sellTo) }))
+        .filter((x) => x.gain > 0)
+        .sort((a, b) => b.gain - a.gain)
+        .slice(0, Settings.MAX_TRACKED)
+        .map((x) => x.ref);
+      Env.write(BEST_KEY, { code, at: Date.now(), refs });
+      paint();
+      Panel.refresh("assist");
+    } catch (err) {
+      Env.log.warn("assist best items failed", err.message);
+    }
+  }
+
+  function bestShown() {
+    const b = bestOn() ? best() : null;
+    return !!b && b.code === bestCode();
+  }
+
   function tracked() {
+    if (bestShown()) return best().refs;
     const picked = Settings.get("assist_track");
-    if (picked.length) return picked;
     const leg = Trip.get().active ? Trip.currentLeg() : null;
-    return leg && leg.item_id ? [{ id: leg.item_id, name: leg.item_name }] : [];
+    if (!leg || !leg.item_id || picked.some((r) => r.id === leg.item_id)) return picked;
+    return [...picked, { id: leg.item_id, name: leg.item_name }];
+  }
+
+  function destination() {
+    const trip = Trip.get();
+    if (Page.mode() !== "agency" && trip.country) return trip.country;
+    const leg = trip.active ? Trip.currentLeg() : null;
+    return Page.selectedDestination() || (leg && leg.country) || null;
+  }
+
+  function exportPick() {
+    if (!Settings.get("assist_export")) return null;
+    const code = destination();
+    const best = code ? ViewExports.bestFor(code) : null;
+    return best ? { id: best.id, name: best.name } : null;
+  }
+
+  const kitNames = (kit) => new Set([kit.hosp, kit.med, ...kit.extras].filter(Boolean).map((r) => r.name));
+
+  let notedKey = "";
+
+  async function notePacked(items) {
+    const kit = Settings.get("assist_kit");
+    const key = JSON.stringify([items, kit]);
+    if (key === notedKey) return;
+    notedKey = key;
+    const keep = kitNames(kit);
+    const names = [...new Set(items.filter((name) => !keep.has(name)))];
+    const refs = [];
+    if (names.length) {
+      let catalogue;
+      try { catalogue = await itemCatalogue(); } catch (e) { notedKey = ""; return; }
+      for (const name of names) {
+        const it = catalogue.get(name);
+        if (it && it.type !== "Weapon" && it.type !== "Armor") refs.push({ id: it.id, name });
+      }
+    }
+    if (key !== notedKey || JSON.stringify(visit().sell || []) === JSON.stringify(refs)) return;
+    markVisit({ sell: refs });
+    paint();
   }
 
   function facts() {
     const mode = Page.mode();
     const inv = Page.travelInventory();
     const v = visit();
+    const kit = Settings.get("assist_kit");
+    const pick = mode === "agency" ? exportPick() : null;
     return {
       mode,
-      kit: Settings.get("assist_kit"),
+      kit,
       track: tracked(),
-      sell: Settings.get("assist_sell"),
+      sell: v.sell || [],
+
+      fill: pick && !kitNames(kit).has(pick.name) && !skipPack.has(pick.name) ? pick : null,
+      skipPack: [...skipPack],
+      skipped: { hosp: v.noHosp === true, med: v.noMed === true, leave: v.leave === true,
+                 buy: v.noBuy || [] },
       carried: inv ? inv.items : null,
       room: inv ? inv.slots - inv.packed : null,
       hospital: inHospital(),
@@ -8404,34 +8727,38 @@ const Assist = (() => {
     const count = (ref) => (ref && f.carried ? f.carried.filter((n) => n === ref.name).length : 0);
     const kit = f.kit || { hosp: null, med: null, meds: 0, extras: [] };
 
+    const selling = (f.sell || [])
+      .map((ref) => ({ ref, n: count(ref) }))
+      .filter((x) => x.n > 0);
+    const toSell = selling.reduce((sum, x) => sum + x.n, 0);
+
     if (f.mode === "agency") {
       const need = [];
       if (kit.hosp) need.push({ ref: kit.hosp, n: 1 });
       if (kit.med && kit.meds > 0) need.push({ ref: kit.med, n: kit.meds });
       for (const e of kit.extras || []) need.push({ ref: { id: e.id, name: e.name }, n: e.n });
-      if (!need.length || !f.carried) return null;
+      const fill = f.fill;
+      if ((!need.length && !fill && !toSell) || !f.carried) return null;
       for (const { ref, n } of need) {
         const have = count(ref);
-        if (have < n) {
+        if (have < n && !(f.skipPack || []).includes(ref.name)) {
           if (f.room !== null && f.room <= 0) {
             if (have > 0) continue;
             return { label: "Your bag is full", note: "No room for " + ref.name + "." };
           }
           if (f.room !== null && f.room > 1 && n - have >= f.room) {
-            return { act: "pack", ref, fill: true, label: "Fill " + ref.name + " (" + f.room + " slots)" };
+            return { act: "pack", ref, fill: true, skip: "pack",
+                     label: "Fill " + ref.name + " (" + f.room + " slots)" };
           }
-          return { act: "pack", ref, label: "Pack " + ref.name + " (" + (have + 1) + " of " + n + ")" };
+          return { act: "pack", ref, skip: "pack",
+                   label: "Pack " + ref.name + " (" + (have + 1) + " of " + n + ")" };
         }
       }
-      return { label: "Trip kit packed", note: "Ready to fly." };
-    }
-
-    const toSell = (f.sell || []).filter((ref) => count(ref) > 0);
-    if (f.mode === "flight" && toSell.length) return null;
-    if (f.mode === "abroad" && toSell.length) {
-      const ref = toSell[0];
-      return { act: "sell", ref, label: "Sell " + ref.name,
-               note: "Sell before you self-hosp." };
+      if (fill && f.room > 0) {
+        return { act: "fill", ref: fill, skip: "pack", label: "Pack " + fill.name + " to sell",
+                 note: "Fills your " + f.room + " free slots." };
+      }
+      return { label: need.length ? "Trip kit packed" : "Packed", note: "Ready to fly." };
     }
 
     if (f.mode === "flight") {
@@ -8445,23 +8772,39 @@ const Assist = (() => {
     if (f.mode !== "abroad" || !f.wallet) return null;
 
     const free = Math.max(0, f.wallet.capacity - f.wallet.taken);
-    const meds = kit.med ? count(kit.med) : 0;
-    const hospLeft = kit.hosp ? count(kit.hosp) : 0;
+    const skipped = f.skipped || {};
+    const meds = kit.med && !skipped.med ? count(kit.med) : 0;
+    const hospLeft = kit.hosp && !skipped.hosp ? count(kit.hosp) : 0;
     const shelves = f.track
+      .filter((ref) => !(skipped.buy || []).includes(ref.name))
       .map((ref) => ({ ref, row: f.rows.find((r) => r.id === ref.id) }))
       .filter((x) => x.row);
     const stock = shelves.reduce((sum, x) => sum + x.row.stock, 0);
-    const names = f.track.map((r) => r.name).join(", ");
 
-    const want = f.hospital && meds ? free + 1 : free;
+    const names = (shelves.length ? shelves.map((x) => x.ref) : f.track).map((r) => r.name).join(", ");
+
+    const want = free + toSell + (f.hospital && meds ? 1 : 0);
+
+    const sale = () => {
+      const { ref, n } = selling[0];
+      return { act: "sell", ref, ready, skip: "sell", label: "Sell " + n + " " + ref.name };
+    };
     const ready = want > 0 && shelves.length > 0 && stock >= want;
     const watching = names ? "Watching " + names : "Pick items to watch on the Assist tab";
 
     const buy = () => {
       for (const x of shelves) {
         if (x.row.stock <= 0 || !x.row.price) continue;
-        const amount = Math.min(x.row.stock, free, Math.floor(f.wallet.money / x.row.price));
-        if (amount > 0) return { act: "buy", ref: x.ref, amount, ready, label: "Buy " + amount + " " + x.ref.name };
+        const afford = Math.floor(f.wallet.money / x.row.price);
+        const amount = Math.min(x.row.stock, free, afford);
+        if (amount > 0) {
+
+          const note = amount === free ? ""
+            : afford < x.row.stock ? "Your cash covers " + amount + "."
+                                   : "Only " + amount + " in stock.";
+          return { act: "buy", ref: x.ref, amount, ready, skip: "buy", note,
+                   label: "Buy " + amount + " " + x.ref.name };
+        }
       }
       return null;
     };
@@ -8469,14 +8812,19 @@ const Assist = (() => {
     if (f.hospital) {
       if (!ready) return { label: watching, note: want + " slots to fill.", ready, watch: true };
       if (meds > 0) {
-        return { act: "use", ref: kit.med, ready,
+        return { act: "use", ref: kit.med, ready, skip: "med",
                  label: "Med out (" + meds + " left)", note: "Restocked: " + stock + " in stock." };
       }
 
+      if (toSell) return Object.assign(sale(), { note: "Works once you are out of hospital." });
       const step = buy();
-      if (step) return Object.assign(step, { note: "Torn takes it when your hospital time ends." });
-      return { label: "Restocked", note: "Buy when your hospital time ends.", ready };
+      if (step) {
+        return Object.assign(step, { note: (step.note + " Works once you are out of hospital.").trim() });
+      }
+      return { label: "Restocked", note: "Buy once you are out of hospital.", ready };
     }
+
+    if (toSell) return sale();
 
     if (free === 0 && f.medOut && !f.bought) return { label: "Your bag is full", ready };
 
@@ -8487,11 +8835,13 @@ const Assist = (() => {
     const step = buy();
     if (step) return step;
     if (hospLeft) {
-      return { act: "use", ref: kit.hosp, ready,
+      return { act: "use", ref: kit.hosp, ready, skip: "hosp",
                label: "Self-hosp", note: "Waits in hospital, safe from muggers." };
     }
-    if (f.bought) return { act: "fly", label: "Fly home", note: free + " slots still free.", ready };
-    return { label: watching, note: free + " slots to fill.", ready, watch: true };
+    if (f.bought || skipped.leave) {
+      return { act: "fly", label: "Fly home", note: free + " slots still free.", ready };
+    }
+    return { label: watching, note: free + " slots to fill.", ready, watch: true, skip: "wait" };
   }
 
   function pageKey() {
@@ -8517,6 +8867,11 @@ const Assist = (() => {
     finally { busy = false; }
     const kit = Settings.get("assist_kit");
     const med = step.act === "use" && !!kit.med && step.ref.id === kit.med.id;
+    if (step.act === "fill" && res.refused) skipPack.add(step.ref.name);
+
+    if (step.act === "sell" && (res.ok || (res.refused && !inHospital()))) {
+      markVisit({ sell: (visit().sell || []).filter((r) => r.id !== step.ref.id) });
+    }
     if (res.ok) {
       if (step.act === "buy") markVisit({ bought: true });
       if (step.act === "use" && Page.mode() === "flight") markVisit({ hospUsed: true });
@@ -8526,6 +8881,8 @@ const Assist = (() => {
       setTimeout(paint, SETTLE_MS + 50);
       try { window.dispatchEvent(new Event("focus")); } catch (e) {  }
       if (step.act === "use") Tracker.poke();
+
+      if (step.act === "fly") setTimeout(() => window.location.reload(), 400);
     } else if (step.act === "buy" && visit().medOut && kit.med
                && (facts().carried || []).includes(kit.med.name)) {
 
@@ -8536,22 +8893,46 @@ const Assist = (() => {
     paint();
   }
 
-  function beep() {
+  function skip() {
+    if (busy) return;
+    const step = decide(facts());
+    if (!step || !step.skip) return;
+    const v = visit();
+    if (step.skip === "pack") skipPack.add(step.ref.name);
+    if (step.skip === "sell") markVisit({ sell: (v.sell || []).filter((r) => r.id !== step.ref.id) });
+    if (step.skip === "buy") markVisit({ noBuy: [...(v.noBuy || []), step.ref.name] });
+    if (step.skip === "hosp") markVisit({ noHosp: true });
+    if (step.skip === "med") markVisit({ noMed: true });
+    if (step.skip === "wait") markVisit({ leave: true });
+    message = null;
+    Env.log.event("assist skip " + step.skip + (step.ref ? ": " + step.ref.name : ""));
+    paint();
+  }
+
+  const TONES = {
+    soft: { type: "sine", gain: 0.15, notes: [880, 880] },
+    loud: { type: "square", gain: 0.9, notes: [880, 1320, 880, 1320, 880, 1320] },
+  };
+
+  function beep(level = Settings.get("restock_sound")) {
+    const tone = TONES[level];
+    if (!tone) return;
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
       const ctx = new Ctx();
-      [0, 0.25].forEach((at) => {
+      tone.notes.forEach((hz, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.frequency.value = 880;
-        gain.gain.value = 0.15;
+        osc.type = tone.type;
+        osc.frequency.value = hz;
+        gain.gain.value = tone.gain;
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(ctx.currentTime + at);
-        osc.stop(ctx.currentTime + at + 0.15);
+        osc.start(ctx.currentTime + i * 0.22);
+        osc.stop(ctx.currentTime + i * 0.22 + 0.16);
       });
-      setTimeout(() => ctx.close(), 1000);
+      setTimeout(() => ctx.close(), tone.notes.length * 220 + 500);
     } catch (e) {  }
   }
 
@@ -8560,8 +8941,8 @@ const Assist = (() => {
     if (ready && !wasReady && !alerted) {
       alerted = true;
       if (Settings.get("alerts_on")) {
-        Env.toast("Restocked", step.label + ". " + (step.note || ""));
         beep();
+        Env.toast("Restocked", (step.label + ". " + (step.note || "")).trim());
       }
       Env.log.event("assist: restock seen");
     }
@@ -8578,12 +8959,14 @@ const Assist = (() => {
     bar.id = BAR_ID;
     bar.innerHTML = `
       <div class="oa-line"><span class="oa-brand">Torn Oracle</span><span class="oa-note"></span></div>
-      <button type="button" class="oa-go"></button>
+      <div class="oa-acts"><button type="button" class="oa-go"></button>
+        <button type="button" class="oa-skip">Skip</button></div>
       <div class="oa-msg" role="status"></div>`;
     bar.querySelector(".oa-go").addEventListener("click", (ev) => {
       if (!ev.isTrusted) return;
       press();
     });
+    bar.querySelector(".oa-skip").addEventListener("click", skip);
     return bar;
   }
 
@@ -8592,17 +8975,26 @@ const Assist = (() => {
     const mode = Page.mode();
 
     const v = visit();
-    if (mode === "agency" && Object.keys(v).length) Env.write(VISIT_KEY, {});
+
+    if (mode === "agency" && Object.keys(v).some((k) => k !== "sell")) {
+      Env.write(VISIT_KEY, v.sell ? { sell: v.sell } : {});
+    }
     if (mode === "flight" && (v.bought || v.medOut)) markVisit({ bought: false, medOut: false });
+    const packed = Page.travelInventory();
+    if (packed && (mode === "agency" || (mode === "flight" && Trip.get().phase === "outbound"))) {
+      notePacked(packed.items);
+    }
     if (mode === "abroad" && v.hospUsed) markVisit({ hospUsed: false });
     if (mode === "abroad" && !focused()) {
       if (!drawn) bar.hidden = true;
       return;
     }
+    loadBest();
     const f = facts();
     const step = decide(f);
     const kit = f.kit || {};
-    if ((mode === "flight" || mode === "abroad") && (kit.hosp || kit.med) && !slots && !slotsLoading
+    if ((mode === "flight" || mode === "abroad") && (kit.hosp || kit.med || f.sell.length)
+        && !slots && !slotsLoading
         && focused()) {
       readSlots();
     }
@@ -8625,6 +9017,7 @@ const Assist = (() => {
       ready: !!step.ready && !!step.act,
       label: busy ? "Working…" : step.label,
       disabled: busy || !step.act || settling(),
+      skip: !!step.skip && !busy,
       note: step.note || "",
       msg: message ? message.text : "",
       tone: message && message.tone ? " is-" + message.tone : "",
@@ -8640,6 +9033,7 @@ const Assist = (() => {
     const btn = bar.querySelector(".oa-go");
     btn.textContent = view.label;
     btn.disabled = view.disabled;
+    bar.querySelector(".oa-skip").hidden = !view.skip;
     bar.querySelector(".oa-note").textContent = view.note;
     const msg = bar.querySelector(".oa-msg");
     msg.textContent = view.msg;
@@ -8693,15 +9087,15 @@ const Assist = (() => {
   window.addEventListener("focus", () => schedule());
   document.addEventListener("visibilitychange", () => schedule());
 
-  let typeByName = null;
+  let byName = null;
 
-  async function itemTypes() {
-    if (!typeByName) {
+  async function itemCatalogue() {
+    if (!byName) {
       const payload = await Torn.items();
       const list = Array.isArray(payload.items) ? payload.items : Object.values(payload.items || {});
-      typeByName = new Map(list.map((it) => [it.name, Data.itemType(it.type)]));
+      byName = new Map(list.map((it) => [it.name, { id: Number(it.id), type: Data.itemType(it.type) }]));
     }
-    return typeByName;
+    return byName;
   }
 
   async function keptPacked(items) {
@@ -8712,15 +9106,15 @@ const Assist = (() => {
     const others = items.filter((name) => !extras.has(name) && !used.has(name));
     if (!others.length) return kept;
     let types;
-    try { types = await itemTypes(); } catch (e) { return null; }
+    try { types = await itemCatalogue(); } catch (e) { return null; }
     for (const name of others) {
-      const type = types.get(name);
+      const type = (types.get(name) || {}).type;
       if (type === "Weapon" || type === "Armor") kept += 1;
     }
     return kept;
   }
 
-  return { mount, paint, decide, onObservation, keptPacked, tracked };
+  return { mount, paint, decide, onObservation, keptPacked, tracked, beep, bestOn, bestShown };
 })();
 
 const ViewAssist = (() => {
@@ -8779,7 +9173,9 @@ const ViewAssist = (() => {
     const kit = Settings.get("assist_kit");
     const picked = Settings.get("assist_track");
     const track = Assist.tracked();
-    const sell = Settings.get("assist_sell");
+    const best = Assist.bestShown();
+    const toggle = (name, label) => `<label class="o-auto"><input type="checkbox"
+      data-flag="${name}"${Settings.get(name) ? " checked" : ""}>${label}</label>`;
     const items = error
       ? `<p class="o-note is-warn">${Fmt.esc(error)}
            <button type="button" class="o-link" data-act="retry">Try again</button></p>`
@@ -8800,7 +9196,6 @@ const ViewAssist = (() => {
                  value="${kit.meds}"></div>
       </div>
       <div class="o-group"><h4>Other items to pack</h4>
-        <div class="o-acts" style="margin-top:0"><button type="button" class="o-btn" data-act="follow-plan">Auto add</button></div>
         ${kit.extras.length ? `<div class="o-chips">${kit.extras.map((e) => `
           <span class="o-chip is-on">${Fmt.esc(e.name)} × ${e.n}
             <button type="button" class="o-link" data-unpack="${e.id}" aria-label="Remove">×</button>
@@ -8813,36 +9208,31 @@ const ViewAssist = (() => {
                  value="1" aria-label="How many" style="width:4.5em">
           <button type="button" class="o-btn" data-act="pack">Add</button></div>` : ""}
       </div>
-      <div class="o-group"><h4>Packed items to sell</h4>
-        ${sell.length ? `<div class="o-chips">${sell.map((ref) => `
-          <span class="o-chip is-on">${Fmt.esc(ref.name)}
-            <button type="button" class="o-link" data-unsell="${ref.id}" aria-label="Remove">×</button>
-          </span>`).join("")}</div>` : ""}
-        <p class="o-note">${kit.extras.length ? "Sold when you land, before you self-hosp."
-                                             : "Add items to pack first."}</p>
-        ${kit.extras.length ? `<div class="o-keyform">
-          <input type="text" data-sell list="oracle-sell-items" autocomplete="off"
-                 placeholder="Add a packed item">
-          <button type="button" class="o-btn" data-act="sell">Add</button></div>
-          <datalist id="oracle-sell-items">${kit.extras.filter((e) => !sell.some((r) => r.id === e.id))
-            .map((e) => `<option value="${Fmt.esc(e.name)}"></option>`).join("")}</datalist>` : ""}
+      <div class="o-group"><h4>Items to sell abroad</h4>
+        <p class="o-note">When you land, the button sells what you packed. Your trip kit, other
+          items to pack, weapons and armor are kept.</p>
+        <p class="o-note">${toggle("assist_export", "Pack the best export for your destination")}</p>
       </div>
       <div class="o-group"><h4>Tracked items</h4>
         <div class="o-acts" style="margin-top:0"><button type="button" class="o-btn" data-act="auto-track">Auto track</button></div>
         ${AutoTrack.warning(track)}
         ${track.length ? `<div class="o-chips">${track.map((ref, i) => `
-          <span class="o-chip is-on">${i + 1}. ${Fmt.esc(ref.name)}${picked.length ? `
+          <span class="o-chip is-on">${i + 1}. ${Fmt.esc(ref.name)}${!best && picked.some((p) => p.id === ref.id) ? `
             ${i > 0 ? `<button type="button" class="o-link" data-up="${ref.id}" aria-label="Move up">↑</button>` : ""}
             <button type="button" class="o-link" data-drop="${ref.id}" aria-label="Remove">×</button>` : ""}
           </span>`).join("")}</div>` : ""}
-        <p class="o-note">${picked.length
-          ? "The first item in stock is bought first."
-          : track.length ? "This is your plan's item. Add items to track others."
-                         : "Add the items you fly for."}</p>
-        ${picked.length < Settings.MAX_TRACKED ? `<div class="o-keyform">
+        <p class="o-note">${best
+          ? "The most profitable items of the country you fly to. Your own list is kept for when this is off."
+          : picked.length
+            ? "The first item in stock is bought first. Your plan's item is tracked after your own."
+            : track.length ? "This is your plan's item. Add items to track others."
+                           : "Add the items you fly for."}</p>
+        ${!best && picked.length < Settings.MAX_TRACKED ? `<div class="o-keyform">
           <input type="text" data-track list="oracle-abroad-items" autocomplete="off"
                  placeholder="Add an item sold abroad">
           <button type="button" class="o-btn" data-act="track">Add</button></div>` : ""}
+        <p class="o-note">${toggle("assist_auto_track", "Track the best items")}
+          ${Assist.bestOn() && !best ? "<br>The list is set when you pick a destination." : ""}</p>
       </div>
       ${catalogue ? options("oracle-all-items", false) + options("oracle-abroad-items", true) : ""}`;
     wire(el);
@@ -8877,42 +9267,6 @@ const ViewAssist = (() => {
     Panel.refresh("assist", true);
   }
 
-  // code : pays d'une étape du plan (lien « add to pack » de l'onglet Plan), sinon prochaine étape
-  async function followPlan(code) {
-    const leg = Trip.get().active ? Trip.currentLeg() : null;
-    const country = code || (leg && leg.country);
-    if (!country) { tell("No active plan.", "warn"); return; }
-    const exp = ViewExports.bestFor(country);
-    if (!exp) { tell("No export pays for " + Data.name(country) + " right now (or exports still loading).", "warn"); return; }
-    if (!catalogue) await loadCatalogue();  // lien du Plan : onglet Assist pas encore ouvert
-    const hit = find(exp.name, false);
-    if (!hit) { tell("No item is named " + exp.name + ".", "warn"); return; }
-    const kit = Settings.get("assist_kit");
-    const extras = kit.extras.filter((e) => e.id !== hit.id);
-    // Places de la valise moins le reste du kit (self-hosp, med-out, autres objets)
-    const taken = (kit.hosp ? 1 : 0) + (kit.med ? kit.meds || 0 : 0) + extras.reduce((t, e) => t + e.n, 0);
-    const n = Math.min(exp.units, Settings.MAX_EXTRA_COUNT, Settings.get("capacity") - taken);
-    if (n <= 0) { tell("No room left in your suitcase for " + hit.name + ".", "warn"); return; }
-    if (extras.length >= Settings.MAX_EXTRAS) { tell("Remove an item to pack first.", "warn"); return; }
-    const sell = Settings.get("assist_sell");
-    if (!sell.some((r) => r.id === hit.id)) Settings.set("assist_sell", [...sell, { id: hit.id, name: hit.name }]);
-    setKit({ extras: [...extras, { id: hit.id, name: hit.name, n }] });
-    tell("Packing " + n + " x " + hit.name + " for " + Data.name(country) + ".");
-  }
-
-  function addSell(el) {
-    const input = el.querySelector("[data-sell]");
-    const name = input ? input.value.trim() : "";
-    if (!name) return;
-    const hit = Settings.get("assist_kit").extras.find((e) => e.name.toLowerCase() === name.toLowerCase());
-    if (!hit) { tell("Add " + name + " to Other items to pack first.", "warn"); return; }
-    const sell = Settings.get("assist_sell");
-    if (sell.some((r) => r.id === hit.id)) { tell(hit.name + " is already in the list.", "warn"); return; }
-    Settings.set("assist_sell", [...sell, { id: hit.id, name: hit.name }]);
-    Assist.paint();
-    Panel.refresh("assist", true);
-  }
-
   function addExtra(el) {
     const input = el.querySelector("[data-extra]");
     const name = input ? input.value : "";
@@ -8939,19 +9293,17 @@ const ViewAssist = (() => {
       });
     }
     const meds = el.querySelector('input[data-kit="meds"]');
-    const sellInput = el.querySelector("[data-sell]");
-    if (sellInput) sellInput.addEventListener("keydown", (ev) => { if (ev.key === "Enter") addSell(el); });
-    for (const btn of el.querySelectorAll("[data-unsell]")) {
-      btn.addEventListener("click", () => {
-        Settings.set("assist_sell", Settings.get("assist_sell").filter((r) => r.id !== Number(btn.dataset.unsell)));
-        Assist.paint();
-        Panel.refresh("assist", true);
-      });
-    }
     if (meds) meds.addEventListener("change", () => setKit({ meds: Number(meds.value) || 0 }));
     const track = el.querySelector("[data-track]");
     if (track) {
       track.addEventListener("keydown", (ev) => { if (ev.key === "Enter") addTracked(el); });
+    }
+    for (const box of el.querySelectorAll("[data-flag]")) {
+      box.addEventListener("change", () => {
+        Settings.set(box.dataset.flag, box.checked);
+        Assist.paint();
+        Panel.refresh("assist", true);
+      });
     }
     const extra = el.querySelector("[data-extra]");
     if (extra) {
@@ -8960,7 +9312,6 @@ const ViewAssist = (() => {
     for (const btn of el.querySelectorAll("[data-unpack]")) {
       btn.addEventListener("click", () => {
         const id = Number(btn.dataset.unpack);
-        Settings.set("assist_sell", Settings.get("assist_sell").filter((r) => r.id !== id));
         setKit({ extras: Settings.get("assist_kit").extras.filter((e) => e.id !== id) });
       });
     }
@@ -8969,8 +9320,6 @@ const ViewAssist = (() => {
         if (btn.dataset.act === "track") addTracked(el);
         if (btn.dataset.act === "auto-track") AutoTrack.manual();
         if (btn.dataset.act === "pack") addExtra(el);
-        if (btn.dataset.act === "sell") addSell(el);
-        if (btn.dataset.act === "follow-plan") followPlan();
         if (btn.dataset.act === "retry") { error = null; loadCatalogue(); }
       });
     }
@@ -8994,7 +9343,7 @@ const ViewAssist = (() => {
     }
   }
 
-  return { id: "assist", label: "Assist", render, followPlan };
+  return { id: "assist", label: "Assist", render };
 })();
 
 const News = (() => {
@@ -9545,164 +9894,6 @@ const ExportWatch = (() => {
   };
 })();
 
-// Fork : presets. Réglages de voyage, d'achat, de prévision et d'Assist sauvés sous un nom, rechargés en un clic.
-// Section « Presets » de l'onglet Settings ; stockage local du fork (et stockage durable de Torn PDA).
-const Presets = (() => {
-  "use strict";
-
-  const KEY = "fork_presets";
-  const GROUPS = ["trips", "buying", "forecast", "assist"];
-  // Lus par le script dans l'agence de voyage : un preset ne doit pas les figer
-  const SKIP = ["capacity", "extra_slots", "extra_type"];
-  const NAME_MAX = 40;
-  const ARM_MS = 4000;
-
-  let draft = null;   // nom en cours de saisie (null : nom du preset actif)
-  let picked = null;  // preset choisi dans « My presets »
-  let armed = null;   // preset dont la suppression attend confirmation
-  let armTimer = null;
-
-  const rows = () => Settings.SCHEMA.filter((r) => GROUPS.includes(r.group) && !SKIP.includes(r.name));
-  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  // Fmt.esc n'échappe pas les guillemets : indispensable dans un attribut HTML
-  const attr = (v) => Fmt.esc(v).replace(/"/g, "&quot;");
-
-  function state() {
-    const live = Env.read(KEY, null);
-    const kept = Env.durable(KEY);
-    const s = (kept && kept.at > ((live && live.at) || 0)) ? kept : live;
-    return s && s.presets ? s : { at: 0, presets: {}, active: null };
-  }
-
-  function store(s) {
-    s.at = Date.now();
-    Env.write(KEY, s);
-    Env.keep(KEY, s);
-  }
-
-  function snapshot() {
-    const out = {};
-    for (const r of rows()) out[r.name] = JSON.parse(JSON.stringify(Settings.get(r.name)));
-    return out;
-  }
-
-  // Un réglage absent du preset (ajouté depuis) ne compte pas comme une modification
-  function modified(p) {
-    return rows().some((r) => Object.prototype.hasOwnProperty.call(p, r.name) && !same(p[r.name], Settings.get(r.name)));
-  }
-
-  function mode(name, s) {
-    if (!name) return { act: "new", label: "Save as new", off: true };
-    if (name === s.active) {
-      const changed = modified(s.presets[name] || {});
-      return { act: "update", label: changed ? "Save changes" : "No changes", off: !changed };
-    }
-    if (s.presets[name]) return { act: "replace", label: "Replace", off: false };
-    return { act: "new", label: "Save as new", off: false };
-  }
-
-  function block(section) {
-    const s = state();
-    const names = Object.keys(s.presets).sort((a, b) => a.localeCompare(b));
-    if (s.active && !s.presets[s.active]) s.active = null;
-    if (!names.includes(picked)) picked = s.active || names[0] || null;
-    const name = draft === null ? (s.active || "") : draft;
-    const m = mode(name.trim(), s);
-    const active = s.active
-      ? `<div class="o-row"><span class="o-row-text"><span class="o-row-label">Active: ${Fmt.esc(s.active)}${
-          modified(s.presets[s.active]) ? " (modified)" : ""}</span></span></div>`
-      : "";
-    const list = names.length
-      ? `<span class="o-row-ctl">
-          <select data-preset-pick aria-label="My presets">${names.map((n) =>
-            `<option value="${attr(n)}"${n === picked ? " selected" : ""}>${Fmt.esc(n)}</option>`).join("")}</select>
-          <button type="button" class="o-btn" data-preset="load">Load</button>
-          <button type="button" class="o-btn" data-preset="delete">${armed === picked ? "Confirm delete" : "Delete"}</button>
-        </span>`
-      : `<span class="o-row-help">No presets yet.</span>`;
-    return section("presets", "Presets", "Save your plan, buying, forecast and Assist settings under a name", `
-      ${active}
-      <div class="o-row"><span class="o-row-text"><span class="o-row-label">Save preset</span></span>
-        <span class="o-row-ctl">
-          <input type="text" data-preset-name maxlength="${NAME_MAX}" value="${attr(name)}"
-            placeholder="Preset name" aria-label="Preset name">
-          <button type="button" class="o-btn" data-preset="save"${m.off ? " disabled" : ""}>${m.label}</button>
-        </span></div>
-      <div class="o-row"><span class="o-row-text"><span class="o-row-label">My presets</span></span>${list}</div>`);
-  }
-
-  function wire(el, tell) {
-    const input = el.querySelector("[data-preset-name]");
-    const save = el.querySelector('[data-preset="save"]');
-    if (input && save) {
-      input.addEventListener("input", () => {
-        draft = input.value;
-        const m = mode(draft.trim(), state());
-        save.textContent = m.label;
-        save.disabled = m.off;
-      });
-      input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !save.disabled) save.click(); });
-    }
-    const pick = el.querySelector("[data-preset-pick]");
-    if (pick) pick.addEventListener("change", () => { picked = pick.value; disarm(); Panel.refresh("settings"); });
-    for (const btn of el.querySelectorAll("[data-preset]")) {
-      btn.addEventListener("click", () => act(btn.dataset.preset, input, tell));
-    }
-  }
-
-  function disarm() {
-    clearTimeout(armTimer);
-    armed = null;
-  }
-
-  function act(what, input, tell) {
-    const s = state();
-    if (what === "save") {
-      const name = (input.value || "").trim().slice(0, NAME_MAX);
-      const m = mode(name, s);
-      if (m.off) return;
-      s.presets[name] = snapshot();
-      s.active = name;
-      store(s);
-      draft = null;
-      picked = name;
-      tell(m.act === "update" ? `Saved changes to "${name}".`
-        : m.act === "replace" ? `Replaced "${name}".` : `Saved "${name}".`);
-    } else if (what === "load") {
-      const p = s.presets[picked];
-      if (!p) return;
-      let applied = 0;
-      for (const r of rows()) {
-        if (Object.prototype.hasOwnProperty.call(p, r.name) && !same(p[r.name], Settings.get(r.name))
-            && Settings.set(r.name, p[r.name])) applied += 1;
-      }
-      s.active = picked;
-      store(s);
-      draft = null;
-      Panel.applyTheme();
-      Panel.badges();
-      tell(`Loaded "${picked}": ${Fmt.plural(applied, "setting")} changed.`
-        + (applied && Trip.get().active ? " Re-plan to use them." : ""));
-    } else if (what === "delete") {
-      if (armed !== picked) {
-        armed = picked;
-        clearTimeout(armTimer);
-        armTimer = setTimeout(() => { armed = null; Panel.refresh("settings"); }, ARM_MS);
-      } else {
-        disarm();
-        delete s.presets[picked];
-        if (s.active === picked) { s.active = null; draft = null; }
-        store(s);
-        tell(`Deleted "${picked}".`);
-        picked = null;
-      }
-    }
-    Panel.refresh("settings");
-  }
-
-  return { block, wire };
-})();
-
 // Fork : au décollage, les Tracked items d'Assist sont refaits à partir de la boutique de la destination.
 // Vol du plan avec self-hosp prévu (objet réglé dans Assist) : liste vide, Assist attend l'objet du plan.
 const AutoTrack = (() => {
@@ -9900,6 +10091,14 @@ Env.ready().then(function boot() {
 
   Settings.load();
   ExportWatch.start();
+  {
+    const live = Env.read("fork_presets", null), kept = Env.durable("fork_presets");
+    const old = (kept && kept.at > ((live && live.at) || 0)) ? kept : live;
+    if (old && old.presets && Object.keys(old.presets).length && !Object.keys(Settings.presets()).length) {
+      Env.write("presets", old.presets);
+      Env.keep("presets", old.presets);
+    }
+  }
   if (!/sid=travel/.test(location.href)) return;
   BazaarOpen.start();
   Trip.load();
@@ -9982,6 +10181,7 @@ Env.ready().then(function boot() {
 
       ViewShops.follow(value);
       Panel.refresh("shops");
+      Assist.paint();
     }
   });
 
@@ -10034,6 +10234,7 @@ Env.ready().then(function boot() {
 
   Settings.onChange((name) => {
     SettingsSync.changed(name);
+    if (name === "restock_sound") Assist.beep();
 
     if (name === "oracle_token") Escort.forget();
 
@@ -10041,7 +10242,7 @@ Env.ready().then(function boot() {
       Escort.sync({ pressed: true });
     }
     if (name === "torn_key") Tracker.poke();
-    if (name === "compact" || name === "clock_24h" || name === "minimal") Panel.applyTheme();
+    if (name === "clock_24h" || name === "minimal") Panel.applyTheme();
 
     if (name === "oracle_token") {
       Account.forget();
