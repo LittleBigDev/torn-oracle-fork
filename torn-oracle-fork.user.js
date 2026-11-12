@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.8-fork.29
+// @version      2.6.8-fork.30
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.8 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -9454,7 +9454,8 @@ const ExportWatch = (() => {
     el.innerHTML = `
       <div class="o-acts" style="margin-top:0">
         <button type="button" class="o-btn" data-ew-auto title="Watch the export advised for the plan's next run">Auto add</button></div>
-      ${lines ? `<div class="o-scroll"><table><thead><tr><th>Notif.</th><th>Item</th><th class="num">Torn now</th>
+      ${lines ? `<div class="o-scroll"><table><thead><tr><th style="white-space:nowrap"><label><input type="checkbox" data-notif-all${
+          list().every(notifies) ? " checked" : ""} title="All or none"> Notif.</label></th><th>Item</th><th class="num">Torn now</th>
         <th class="num">Shop pays</th><th class="num">Margin</th><th class="num">Alert at</th><th></th></tr></thead>
         <tbody>${lines}</tbody></table></div>` : '<div class="o-empty">No export watch yet.</div>'}
       <div class="o-note">Torn now: cheapest of the item market and bazaars (weav3r.dev). Margin total for
@@ -9474,10 +9475,17 @@ const ExportWatch = (() => {
       form.code = ev.target.value;
       Panel.refresh("exportwatch", true);
     });
+    const all = el.querySelector("[data-notif-all]");
+    if (all) all.addEventListener("change", () => {
+      Env.write(WATCHES, list().map((x) => Object.assign({}, x, { notify: all.checked })));
+      paint();
+      Panel.refresh("exportwatch", true);
+    });
     for (const c of el.querySelectorAll("[data-notif]")) {
       c.addEventListener("change", () => {
         Env.write(WATCHES, list().map((x) => keyOf(x) === c.dataset.notif ? Object.assign({}, x, { notify: c.checked }) : x));
         paint();
+        Panel.refresh("exportwatch", true);  // case globale recalculée
       });
     }
     el.querySelector("[data-ew-auto]").addEventListener("click", autoAdd);
