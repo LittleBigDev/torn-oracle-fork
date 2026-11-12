@@ -9829,12 +9829,29 @@ const BazaarOpen = (() => {
     return btn && /^travel$/i.test(btn.textContent.trim()) ? btn : null;
   }
 
+  // Requête de lecture de la page du bazaar ; réponse illisible : on suppose des objets (bouton affiché)
+  async function hasItems() {
+    const uid = (/(?:^|;\s*)uid=(\d+)/.exec(document.cookie || "") || [])[1];
+    try {
+      const res = await fetch("/bazaar.php?sid=bazaarData&step=getBazaarItems&start=0&ID=" + uid
+        + "&order=default&by=asc&categorised=0&limit=1&rfcv=" + rfc(),
+        { credentials: "same-origin", headers: { "X-Requested-With": "XMLHttpRequest" } });
+      const d = await res.json();
+      const n = d && (d.total ?? (Array.isArray(d.list) ? d.list.length : undefined));
+      Env.log.info("bazaar items: " + n);
+      return n === undefined ? true : Number(n) > 0;
+    } catch (err) {
+      return true;
+    }
+  }
+
   async function check() {
     if (checking || Date.now() - state.at < RECHECK_MS || !Torn.haveKey()) return;
     checking = true;
     try {
       const d = await Torn.get("user/bazaar", { ttl: 0 });
-      state = { at: Date.now(), show: !!d.bazaar_exists && !d.bazaar_is_open && (d.bazaar || []).length > 0 };
+      // Bazaar fermé : l'API renvoie une liste vide, les objets se lisent sur la page du bazaar
+      state = { at: Date.now(), show: !!d.bazaar_exists && !d.bazaar_is_open && await hasItems() };
     } catch (err) {
       state = { at: Date.now(), show: false };
     } finally {
