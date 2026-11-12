@@ -5,10 +5,10 @@
 Fork of **Torn Oracle: Travel** (author: Ruinbringer, license GPL-3.0-only, [Greasy Fork](https://greasyfork.org/en/scripts/590310-torn-oracle-travel)): wherever Torn Oracle shows a profit (plans, plan purchases, Shops, Watches, Museum), each item is sold through its best channel.
 
 - Wardogs traders: market value × the category rate (98, 95 or 90 %)
-- item market: 85 % of market value
+- your bazaar: 1 $ under the cheapest bazaar, never under 97 % of market value (floor). Only the floor is counted, so the margin shown is the minimum you get
 - city: the shop's buyback price
 
-The Shops tab has a **Sell** column showing that channel (Traders, Item market, or the name of the shop that buys it back). The "Sell to" and "Sell under market" settings no longer have any effect.
+The Shops tab has a **Sell** column showing that channel (Traders, Bazaar, or the name of the shop that buys it back). The "Sell to" and "Sell under market" settings no longer have any effect.
 
 ## Export alert
 
@@ -22,9 +22,9 @@ Travel agency, **Open bazaar** button left of TRAVEL: shown only when you own a 
 
 **Assist** tab, **Fill** button: when an item still to pack needs at least as many units as you have free slots, the button becomes "Fill <item> (N slots)" and fills every free slot in one click, with the same single request as Torn's own FILL button.
 
-## Tracked items set at take-off
+## Tracked items
 
-When a flight to another country starts, the **Tracked items** list of the **Assist** tab is replaced by the destination's profitable items, best margin first (10 at most). On a planned flight with a self-hosp item set on the Assist tab, the list is simply emptied: Assist then waits for the plan's item. The **Auto track** button under the list does the same at any time (country of the current flight, else the destination selected on the page, else the plan's). A warning appears under the button when your cash can't buy a full bag of a tracked item.
+Torn Oracle's own **Track the best items** box (Assist tab) ranks items with the fork's margin (best channel above). With a self-hosp item set and a plan step to that country, only the plan's item is tracked: otherwise another item's restock would trigger the med-out and Assist would offer to buy that other item. A warning appears under **Tracked items** when your cash can't buy a full bag of a tracked item (`cash_warning.js`).
 
 ## Presets
 
@@ -49,10 +49,10 @@ GPL-3.0-only, like the original (`LICENSE`).
 Fork de **Torn Oracle: Travel** (auteur : Ruinbringer, licence GPL-3.0-only, [Greasy Fork](https://greasyfork.org/en/scripts/590310-torn-oracle-travel)) : partout où Torn Oracle affiche un profit (plans, achats du plan, Shops, Watches, Museum), la vente se fait au meilleur canal de chaque objet.
 
 - traders Wardogs : market value × taux de la catégorie (98, 95 ou 90 %)
-- item market : 85 % du market value
+- ton bazaar : 1 $ sous le bazaar le moins cher, jamais sous 97 % du market value (plancher). Seul le plancher est compté : la marge affichée est un minimum
 - ville : prix de rachat de la boutique
 
-L'onglet Shops a une colonne **Sell** qui indique ce canal (Traders, Item market ou le nom de la boutique qui rachète). Les réglages « Sell to » et « Sell under market » n'ont plus d'effet.
+L'onglet Shops a une colonne **Sell** qui indique ce canal (Traders, Bazaar ou le nom de la boutique qui rachète). Les réglages « Sell to » et « Sell under market » n'ont plus d'effet.
 
 ### Alerte d'export
 
@@ -66,9 +66,9 @@ Agence de voyage, bouton **Open bazaar** à gauche de TRAVEL : affiché seulemen
 
 Onglet **Assist**, bouton **Fill** : quand il reste à ranger au moins autant d'unités d'un objet que de places libres, le bouton devient « Fill <objet> (N slots) » et remplit toutes les places en un clic, avec la même requête unique que le bouton FILL de Torn.
 
-### Tracked items réglés au décollage
+### Tracked items
 
-Au départ d'un vol vers l'étranger, la liste **Tracked items** de l'onglet **Assist** est remplacée par les objets rentables de la destination, meilleure marge d'abord (10 au maximum). Sur un vol du plan avec un objet de self-hosp réglé dans Assist, la liste est simplement vidée : Assist attend alors l'objet du plan. Le bouton **Auto track**, sous le titre de la liste, fait la même chose à tout moment (pays du vol en cours, sinon destination choisie sur la page, sinon celle du plan). Un avertissement s'affiche sous le bouton si ton argent en main ne permet pas d'acheter une valise pleine d'un objet suivi.
+La case native **Track the best items** (onglet Assist) classe les objets avec la marge du fork (meilleur canal, ci-dessus). Avec un objet de self-hosp réglé et une étape du plan vers ce pays, seul l'objet du plan est suivi : sinon le restock d'un autre objet déclencherait le med-out et Assist proposerait d'acheter cet autre objet. Un avertissement s'affiche sous **Tracked items** si ton argent en main ne paie pas une valise pleine d'un objet suivi (`cash_warning.js`).
 
 ### Presets
 

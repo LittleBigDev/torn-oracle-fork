@@ -1,60 +1,13 @@
-// Fork : au décollage, les Tracked items d'Assist sont refaits à partir de la boutique de la destination.
-// Vol du plan avec self-hosp prévu (objet réglé dans Assist) : liste vide, Assist attend l'objet du plan.
-const AutoTrack = (() => {
+// Fork : onglet Assist, sous Tracked items, avertissement quand l'argent en main ne paie pas une valise pleine
+// d'un objet suivi (le suivi lui-même est natif depuis 2.6.9 : « Track the best items »).
+const CashWarning = (() => {
   "use strict";
-
-  function margin(item) {
-    return Data.margin(item.market_value, item.sell_price, item.cost, null, item.name);
-  }
-
-  // Tri « Best margin » de l'onglet Shops ; Settings garde les MAX_TRACKED premiers
-  function profitable(items) {
-    return items
-      .map((item) => ({ id: item.item_id, name: item.name, margin: margin(item) }))
-      .filter((row) => row.margin > 0)
-      .sort((a, b) => (b.margin - a.margin) || a.name.localeCompare(b.name))
-      .map(({ id, name }) => ({ id, name }));
-  }
-
-  function show() {
-    Assist.paint();
-    Panel.refresh("assist", true);
-  }
-
-  async function fill(code, planned, manual) {
-    Panel.flash("", "", "assist");
-    Settings.set("assist_track", []);
-    show();
-    if (planned && Settings.get("assist_kit").hosp) {
-      if (manual) Panel.flash("Self-hosp planned: tracking the plan's item only.", "", "assist");
-      return;
-    }
-    try {
-      const shop = await Oracle.shop(code);
-      Settings.set("assist_track", profitable(shop.items || []));
-      show();
-    } catch (err) {
-      Env.log.warn("auto track failed", err.message);
-      Panel.flash("Could not read the shop to fill Tracked items.", "warn", "assist");
-    }
-  }
-
-  function departed(ev) {
-    const code = Trip.get().country;
-    return code ? fill(code, !!ev.leg && !ev.offPlan) : undefined;
-  }
 
   // Pays du vol en cours, sinon destination choisie sur la page, sinon celle du plan
   function target() {
     const trip = Trip.get();
     const leg = trip.active ? Trip.currentLeg() : null;
     return { leg, code: trip.country || Page.selectedDestination() || (leg && leg.country) };
-  }
-
-  function manual() {
-    const { leg, code } = target();
-    if (!code) { Panel.flash("Pick a destination first.", "warn", "assist"); return undefined; }
-    return fill(code, !!leg && !leg.runtime.flewTo && leg.country === code, true);
   }
 
   // Avertissement de cash : boutique relue au plus une fois par minute, onglet Assist affiché
@@ -101,6 +54,5 @@ const AutoTrack = (() => {
       You won't be able to buy the maximum, so profit may be lower.</p>`;
   }
 
-  return { departed, manual, warning };
+  return { warning };
 })();
-

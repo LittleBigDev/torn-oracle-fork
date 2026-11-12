@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.9-fork
+// @version      2.6.9-fork.1
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.9 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -278,19 +278,19 @@ const Data = (() => {
     return Math.round(c.minutes[0] * t.mult);
   }
 
-  // Fork : taux des traders Wardogs par objet (généré par maj.py), sinon item market (85 %)
-  const TAUX_TRADERS = {"African Violet": 0.98, "Aluminum Plate": 0.9, "Banana Orchid": 0.98, "Basalt Point": 0.9, "Bolt Cutters": 0.9, "Bonded Latex": 0.9, "Bottle of Sake": 0.95, "Bottle of Tequila": 0.95, "Camel Plushie": 0.98, "Cannabis": 0.95, "Card Skimmer": 0.9, "Ceibo Flower": 0.98, "Chalcedony Point": 0.9, "Chamois Plushie": 0.98, "Cherry Blossom": 0.98, "Chert Point": 0.9, "Claymore Mine": 0.95, "Crocus": 0.98, "Dahlia": 0.98, "Dog Treats": 0.9, "Dozen White Roses": 0.98, "Ecstasy": 0.95, "Edelweiss": 0.98, "Fireworks": 0.95, "Flash Grenade": 0.95, "Glow Stick": 0.9, "Gold Laptop": 0.9, "Grenade": 0.95, "HEG": 0.95, "Heather": 0.98, "Hydrochloric Acid": 0.9, "Inkwell": 0.9, "Jaguar Plushie": 0.98, "Ketamine": 0.95, "LSD": 0.95, "Large Suitcase": 0.9, "Lighter": 0.9, "Lion Plushie": 0.98, "Magnesium Shavings": 0.9, "Medium Suitcase": 0.9, "Meteorite Fragment": 0.9, "Monkey Plushie": 0.98, "Nessie Plushie": 0.98, "Neumune Tablet": 0.9, "Ninja Star": 0.95, "Obsidian Point": 0.9, "Opium": 0.95, "Orchid": 0.98, "PCP": 0.95, "PVC Cards": 0.9, "Panda Plushie": 0.98, "Patagonian Fossil": 0.9, "Peony": 0.98, "Potassium Nitrate": 0.9, "Printing Paper": 0.9, "Quartz Point": 0.9, "Quartzite Point": 0.9, "Red Fox Plushie": 0.98, "Shrooms": 0.95, "Small Suitcase": 0.9, "Smoke Grenade": 0.95, "Speed": 0.95, "Sports Sneakers": 0.9, "Stick Grenade": 0.95, "Stick of Dynamite": 0.9, "Stingray Plushie": 0.98, "Tear Gas": 0.95, "Throwing Knife": 0.95, "Tribulus Omanense": 0.98, "Trout": 0.95, "Vicodin": 0.95, "Wolverine Plushie": 0.98, "Xanax": 0.95, "Zip Ties": 0.9};
+  // Fork : taux des traders Wardogs par objet (généré par maj.py), sinon bazaar (plancher 97 %)
+  const TAUX_TRADERS = {"African Violet": 0.98, "Banana Orchid": 0.98, "Camel Plushie": 0.98, "Ceibo Flower": 0.98, "Chamois Plushie": 0.98, "Cherry Blossom": 0.98, "Crocus": 0.98, "Dahlia": 0.98, "Dozen White Roses": 0.98, "Edelweiss": 0.98, "Heather": 0.98, "Jaguar Plushie": 0.98, "Lion Plushie": 0.98, "Monkey Plushie": 0.98, "Nessie Plushie": 0.98, "Orchid": 0.98, "Panda Plushie": 0.98, "Peony": 0.98, "Red Fox Plushie": 0.98, "Stingray Plushie": 0.98, "Tribulus Omanense": 0.98, "Wolverine Plushie": 0.98};
   const BOUTIQUES = {"9mm Uzi": "Big Al's Gun Shop", "AK-47": "Big Al's Gun Shop", "African Violet": "Bits 'n' Bobs", "Afro Comb": "Recycling Center", "Ambergris Lump": "Jewelry Store", "ArmaLite M-15A4": "Big Al's Gun Shop", "Axe": "Big Al's Gun Shop", "BT MP9": "Big Al's Gun Shop", "Banana Orchid": "Bits 'n' Bobs", "Bear Gall": "Nikeh Sports", "Bearer Bond": "Pawn Shop", "Bikini": "TC Clothing", "Blowgun": "Big Al's Gun Shop", "Bo Staff": "Big Al's Gun Shop", "Bottle of Sake": "Bits 'n' Bobs", "Bottle of Tequila": "Bits 'n' Bobs", "Bushmaster Carbon 15": "Big Al's Gun Shop", "Camel Plushie": "Bits 'n' Bobs", "Ceibo Flower": "Bits 'n' Bobs", "Chain Whip": "Big Al's Gun Shop", "Chamois Plushie": "Bits 'n' Bobs", "Cherry Blossom": "Bits 'n' Bobs", "Chopsticks": "Bits 'n' Bobs", "Claymore Mine": "Big Al's Gun Shop", "Claymore Sword": "Big Al's Gun Shop", "Cobra Derringer": "Big Al's Gun Shop", "Coconut Bra": "TC Clothing", "Combat Boots": "Big Al's Gun Shop", "Combat Gloves": "Big Al's Gun Shop", "Combat Helmet": "Big Al's Gun Shop", "Combat Pants": "Big Al's Gun Shop", "Combat Vest": "Big Al's Gun Shop", "Compass": "Bits 'n' Bobs", "Counterfeit Manga": "Pawn Shop", "Crazy Straw": "Recycling Center", "Cricket Bat": "Big Al's Gun Shop", "Crocus": "Bits 'n' Bobs", "Crossbow": "Big Al's Gun Shop", "Dahlia": "Bits 'n' Bobs", "Dart Board": "Recycling Center", "Desert Eagle": "Big Al's Gun Shop", "Diamond Bladed Knife": "Big Al's Gun Shop", "Diving Gloves": "TC Clothing", "Edelweiss": "Bits 'n' Bobs", "Elephant Statue": "Bits 'n' Bobs", "Enfield SA-80": "Big Al's Gun Shop", "Ephedrine Powder": "Pharmacy", "Ergotamine Ampoule": "Pharmacy", "Fire Hydrant": "Recycling Center", "Fireworks": "Big Al's Gun Shop", "Flail": "Big Al's Gun Shop", "Flak Jacket": "Big Al's Gun Shop", "Flamethrower": "Big Al's Gun Shop", "Flare Gun": "Big Al's Gun Shop", "Flash Grenade": "Big Al's Gun Shop", "Flexible Body Armor": "Big Al's Gun Shop", "Flippers": "TC Clothing", "Frying Pan": "Big Al's Gun Shop", "Grenade": "Big Al's Gun Shop", "Guandao": "Big Al's Gun Shop", "HEG": "Big Al's Gun Shop", "Harpoon": "Big Al's Gun Shop", "Heather": "Bits 'n' Bobs", "Heckler & Koch SL8": "Big Al's Gun Shop", "Hockey Stick": "Bits 'n' Bobs", "Hydrochloric Acid": "Pharmacy", "Ice Pick": "Big Al's Gun Shop", "Insulin": "Pharmacy", "Ithaca 37": "Big Al's Gun Shop", "Jackhammer": "Big Al's Gun Shop", "Jade Buddha": "Recycling Center", "Jaguar Plushie": "Bits 'n' Bobs", "Kabuki Mask": "TC Clothing", "Kama": "Big Al's Gun Shop", "Katana": "Big Al's Gun Shop", "Kevlar Gloves": "Big Al's Gun Shop", "Knuckle Dusters": "Big Al's Gun Shop", "Kodachi": "Big Al's Gun Shop", "Large Suitcase": "Bits 'n' Bobs", "Leather Bullwhip": "Big Al's Gun Shop", "Lion Plushie": "Bits 'n' Bobs", "Liquid Body Armor": "Big Al's Gun Shop", "Lorcin 380": "Big Al's Gun Shop", "M249 SAW": "Big Al's Gun Shop", "Macana": "Big Al's Gun Shop", "Mag 7": "Big Al's Gun Shop", "Maneki Neko": "Recycling Center", "Mayan Statue": "Bits 'n' Bobs", "Medium Suitcase": "Bits 'n' Bobs", "Metal Nunchaku": "Big Al's Gun Shop", "Minigun": "Big Al's Gun Shop", "Model Space Ship": "Recycling Center", "Monkey Plushie": "Bits 'n' Bobs", "Mountie Hat": "TC Clothing", "Natural Pearls": "Jewelry Store", "Naval Cutlass": "Big Al's Gun Shop", "Nessie Plushie": "Bits 'n' Bobs", "Neumune Tablet": "Pharmacy", "Ninja Claws": "Big Al's Gun Shop", "Ninja Star": "Big Al's Gun Shop", "Nodding Turtle": "Recycling Center", "Orchid": "Bits 'n' Bobs", "Outer Tactical Vest": "Big Al's Gun Shop", "Panda Plushie": "Bits 'n' Bobs", "Pangolin Scales": "Nikeh Sports", "Paper Weight": "Bits 'n' Bobs", "Pele Charm": "Bits 'n' Bobs", "Peony": "Bits 'n' Bobs", "Proda Sunglasses": "TC Clothing", "Qsz-92": "Big Al's Gun Shop", "Raw Ivory": "Pawn Shop", "Red Fox Plushie": "Bits 'n' Bobs", "SIG 552": "Big Al's Gun Shop", "SKS Carbine": "Big Al's Gun Shop", "Safety Boots": "Big Al's Gun Shop", "Safrole Oil": "Pharmacy", "Sai": "Big Al's Gun Shop", "Samurai Sword": "Big Al's Gun Shop", "Sensu": "Bits 'n' Bobs", "Sextant": "Recycling Center", "Shark Fin": "Nikeh Sports", "Ship in a Bottle": "Recycling Center", "Small Suitcase": "Bits 'n' Bobs", "Smoke Grenade": "Big Al's Gun Shop", "Snorkel": "TC Clothing", "Snowboard": "Recycling Center", "Soccer Ball": "Bits 'n' Bobs", "Spear": "Big Al's Gun Shop", "Speedo": "TC Clothing", "Sports Shades": "TC Clothing", "Springfield 1911": "Big Al's Gun Shop", "Steel Drum": "Recycling Center", "Stick Grenade": "Big Al's Gun Shop", "Stingray Plushie": "Bits 'n' Bobs", "Sumo Doll": "Bits 'n' Bobs", "Swiss Army Knife": "Big Al's Gun Shop", "Tailor's Dummy": "Recycling Center", "Taser": "Big Al's Gun Shop", "Taurus PT92": "Big Al's Gun Shop", "Tavor TAR-21": "Big Al's Gun Shop", "Tear Gas": "Big Al's Gun Shop", "Throwing Knife": "Big Al's Gun Shop", "Tiger Bone Powder": "Nikeh Sports", "Trench Coat": "TC Clothing", "Tribulus Omanense": "Bits 'n' Bobs", "Trout": "Big Al's Gun Shop", "Turtle Shell": "Jewelry Store", "Twin Tiger Hooks": "Big Al's Gun Shop", "Type 98 Anti Tank": "Big Al's Gun Shop", "Uncut Diamonds": "Jewelry Store", "Vektor CR-21": "Big Al's Gun Shop", "WWII Helmet": "Big Al's Gun Shop", "Wetsuit": "TC Clothing", "Whale Meat": "Nikeh Sports", "Wolverine Plushie": "Bits 'n' Bobs", "Wooden Nunchaku": "Big Al's Gun Shop", "Wushu Double Axes": "Big Al's Gun Shop", "Yakitori Lantern": "Recycling Center", "Yucca Plant": "Recycling Center"};
 
   function unitSell(marketValue, sellPrice, sellTo, name) {
-    const best = Math.max((marketValue || 0) * Math.max(TAUX_TRADERS[name] || 0, 0.85), sellPrice || 0);
+    const best = Math.max((marketValue || 0) * Math.max(TAUX_TRADERS[name] || 0, 0.97), sellPrice || 0);
     return best > 0 ? best : null;
   }
 
   function channel(marketValue, sellPrice, name) {
     const best = unitSell(marketValue, sellPrice, null, name);
     if (best === null) return null;
-    return best === (sellPrice || 0) ? BOUTIQUES[name] || "City" : TAUX_TRADERS[name] > 0.85 ? "Traders" : "Item market";
+    return best === (sellPrice || 0) ? BOUTIQUES[name] || "City" : TAUX_TRADERS[name] > 0.97 ? "Traders" : "Bazaar";
   }
 
   function margin(marketValue, sellPrice, cost, sellTo, name) {
@@ -3626,12 +3626,12 @@ function plannerCore() {
       if (cfg.excludeTypes && cfg.excludeTypes.indexOf(type) !== -1) continue;
       if (cfg.excludeItems && cfg.excludeItems.indexOf(it.item_id) !== -1) continue;
 
-      // Fork : meilleur canal, traders Wardogs (taux par catégorie), item market (85 %), ville
+      // Fork : meilleur canal, traders Wardogs (taux par catégorie), bazaar (plancher 97 %), ville
       const TRADERS = { flower: .98, plushie: .98, temporary: .95, drug: .95, alcohol: .95, candy: .95,
         booster: .95, "energy drink": .95, "supply pack": .95, tool: .90, material: .90, medical: .90,
         enhancer: .90, special: .90, artifact: .90 };
       const mv = it.market_value || 0;
-      const margin = Math.max(mv * (TRADERS[type] || 0.25), mv * 0.85, it.sell_price || 0) - it.cost;
+      const margin = Math.max(mv * (TRADERS[type] || 0.25), mv * 0.97, it.sell_price || 0) - it.cost;
       if (margin <= 0 || margin < cfg.minMargin) continue;
 
       const windows = [];
@@ -8630,7 +8630,7 @@ const Assist = (() => {
       const sellTo = Settings.get("sell_to");
       const refs = (shop.items || [])
         .map((it) => ({ ref: { id: it.item_id, name: it.name },
-                        gain: Data.margin(it.market_value, it.sell_price, it.cost, sellTo) }))
+                        gain: Data.margin(it.market_value, it.sell_price, it.cost, sellTo, it.name) }))
         .filter((x) => x.gain > 0)
         .sort((a, b) => b.gain - a.gain)
         .slice(0, Settings.MAX_TRACKED)
@@ -8649,6 +8649,10 @@ const Assist = (() => {
   }
 
   function tracked() {
+    const planLeg = Trip.get().active ? Trip.currentLeg() : null;
+    if (planLeg && planLeg.item_id && Settings.get("assist_kit").hosp && planLeg.country === bestCode()) {
+      return [{ id: planLeg.item_id, name: planLeg.item_name }];
+    }
     if (bestShown()) return best().refs;
     const picked = Settings.get("assist_track");
     const leg = Trip.get().active ? Trip.currentLeg() : null;
@@ -9214,8 +9218,7 @@ const ViewAssist = (() => {
         <p class="o-note">${toggle("assist_export", "Pack the best export for your destination")}</p>
       </div>
       <div class="o-group"><h4>Tracked items</h4>
-        <div class="o-acts" style="margin-top:0"><button type="button" class="o-btn" data-act="auto-track">Auto track</button></div>
-        ${AutoTrack.warning(track)}
+        ${CashWarning.warning(track)}
         ${track.length ? `<div class="o-chips">${track.map((ref, i) => `
           <span class="o-chip is-on">${i + 1}. ${Fmt.esc(ref.name)}${!best && picked.some((p) => p.id === ref.id) ? `
             ${i > 0 ? `<button type="button" class="o-link" data-up="${ref.id}" aria-label="Move up">↑</button>` : ""}
@@ -9318,7 +9321,6 @@ const ViewAssist = (() => {
     for (const btn of el.querySelectorAll("[data-act]")) {
       btn.addEventListener("click", () => {
         if (btn.dataset.act === "track") addTracked(el);
-        if (btn.dataset.act === "auto-track") AutoTrack.manual();
         if (btn.dataset.act === "pack") addExtra(el);
         if (btn.dataset.act === "retry") { error = null; loadCatalogue(); }
       });
@@ -9894,63 +9896,16 @@ const ExportWatch = (() => {
   };
 })();
 
-// Fork : au décollage, les Tracked items d'Assist sont refaits à partir de la boutique de la destination.
-// Vol du plan avec self-hosp prévu (objet réglé dans Assist) : liste vide, Assist attend l'objet du plan.
-const AutoTrack = (() => {
+// Fork : onglet Assist, sous Tracked items, avertissement quand l'argent en main ne paie pas une valise pleine
+// d'un objet suivi (le suivi lui-même est natif depuis 2.6.9 : « Track the best items »).
+const CashWarning = (() => {
   "use strict";
-
-  function margin(item) {
-    return Data.margin(item.market_value, item.sell_price, item.cost, null, item.name);
-  }
-
-  // Tri « Best margin » de l'onglet Shops ; Settings garde les MAX_TRACKED premiers
-  function profitable(items) {
-    return items
-      .map((item) => ({ id: item.item_id, name: item.name, margin: margin(item) }))
-      .filter((row) => row.margin > 0)
-      .sort((a, b) => (b.margin - a.margin) || a.name.localeCompare(b.name))
-      .map(({ id, name }) => ({ id, name }));
-  }
-
-  function show() {
-    Assist.paint();
-    Panel.refresh("assist", true);
-  }
-
-  async function fill(code, planned, manual) {
-    Panel.flash("", "", "assist");
-    Settings.set("assist_track", []);
-    show();
-    if (planned && Settings.get("assist_kit").hosp) {
-      if (manual) Panel.flash("Self-hosp planned: tracking the plan's item only.", "", "assist");
-      return;
-    }
-    try {
-      const shop = await Oracle.shop(code);
-      Settings.set("assist_track", profitable(shop.items || []));
-      show();
-    } catch (err) {
-      Env.log.warn("auto track failed", err.message);
-      Panel.flash("Could not read the shop to fill Tracked items.", "warn", "assist");
-    }
-  }
-
-  function departed(ev) {
-    const code = Trip.get().country;
-    return code ? fill(code, !!ev.leg && !ev.offPlan) : undefined;
-  }
 
   // Pays du vol en cours, sinon destination choisie sur la page, sinon celle du plan
   function target() {
     const trip = Trip.get();
     const leg = trip.active ? Trip.currentLeg() : null;
     return { leg, code: trip.country || Page.selectedDestination() || (leg && leg.country) };
-  }
-
-  function manual() {
-    const { leg, code } = target();
-    if (!code) { Panel.flash("Pick a destination first.", "warn", "assist"); return undefined; }
-    return fill(code, !!leg && !leg.runtime.flewTo && leg.country === code, true);
   }
 
   // Avertissement de cash : boutique relue au plus une fois par minute, onglet Assist affiché
@@ -9997,9 +9952,8 @@ const AutoTrack = (() => {
       You won't be able to buy the maximum, so profit may be lower.</p>`;
   }
 
-  return { departed, manual, warning };
+  return { warning };
 })();
-
 // Fork : page de l'agence, bouton « Open bazaar » à gauche de TRAVEL, affiché seulement si le bazaar
 // existe, contient des objets et est fermé. Requêtes relevées le 12/11/2026 (GET, session Torn) :
 // état et contenu : bazaar.php?sid=bazaarData&step=getBazaarContent&ID= (state.isBazaarExists,
@@ -10194,7 +10148,6 @@ Env.ready().then(function boot() {
     PlanSync.changed();
 
     for (const ev of result.events || []) {
-      if (ev.kind === "departed") AutoTrack.departed(ev);
       if (ev.kind === "home") {
         Plan.replanTail("a run finished");
       } else if (ev.kind === "departed" && ev.offPlan) {
