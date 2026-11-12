@@ -14,6 +14,8 @@ const ExportWatch = (() => {
   const list = () => Env.read(WATCHES, []);
   const shared = () => Env.read(SHARED, { at: 0, rows: {}, notified: {}, dismissed: {} });
   const keyOf = (w) => w.id + "|" + w.code;
+  // Notifications par surveillance ; sans réglage propre, l'ancienne case globale (NOTIFY) s'applique
+  const notifies = (w) => w.notify !== undefined ? w.notify : Env.read(NOTIFY, true);
 
   // Taille de valise réglée dans Oracle, moins le trip kit (self-hosp et objets de med-out)
   function units() {
@@ -109,9 +111,8 @@ const ExportWatch = (() => {
   function paint() {
     const s = shared();
     const n = units();
-    // Notifications coupées : rien hors de l'onglet Export watch
-    const live = !Env.read(NOTIFY, true) ? []
-      : hits().filter((w) => s.dismissed[keyOf(w)] !== s.rows[keyOf(w)].price);
+    // Notifications coupées pour une surveillance : rien hors de l'onglet Export watch
+    const live = hits().filter((w) => notifies(w) && s.dismissed[keyOf(w)] !== s.rows[keyOf(w)].price);
     let changed = false;
     for (const w of live) {
       const r = s.rows[keyOf(w)];
@@ -230,7 +231,7 @@ const ExportWatch = (() => {
     await loadShop(code);
     const item = (shopItems[code] || []).find((i) => i.name === exp.name);
     if (!item) { tell(exp.name + " not found in the " + Data.name(code) + " shop yet, try again.", "warn"); return; }
-    const w = { id: Number(item.item_id), name: item.name, code, min: DEFAULT_MIN };
+    const w = { id: Number(item.item_id), name: item.name, code, min: DEFAULT_MIN, notify: true };
     if (list().some((x) => keyOf(x) === keyOf(w))) { tell(w.name + " in " + Data.name(code) + " is already watched.", "warn"); return; }
     save(w);
     tell("Watching " + w.name + " in " + Data.name(code) + ".");
@@ -263,17 +264,16 @@ const ExportWatch = (() => {
            <td class="num">${Fmt.esc(Fmt.price(r.pays))}</td>
            <td class="num"><span class="${r.margin >= w.min ? "go" : "muted"}">${r.margin >= 0 ? "+" : ""}${
              Fmt.esc(Fmt.price(r.margin))}</span><span class="o-sub">${Fmt.esc(Fmt.money(r.margin * units()))}</span></td>`;
-      return `<tr><td>${Fmt.esc(w.name)}<span class="o-sub">${Fmt.esc(Data.name(w.code))}</span></td>${cells}
+      return `<tr><td><input type="checkbox" data-notif="${Fmt.esc(keyOf(w))}"${notifies(w) ? " checked" : ""}
+          title="Notify for this item"></td><td>${Fmt.esc(w.name)}<span class="o-sub">${Fmt.esc(Data.name(w.code))}</span></td>${cells}
         ${minCell(w)}
         <td><button type="button" class="o-link" data-del="${Fmt.esc(keyOf(w))}" title="Stop watching">&times;</button></td></tr>`;
     }).join("");
     const items = shopItems[form.code] || [];
     el.innerHTML = `
-      <div class="o-field"><label style="display:flex;align-items:center;gap:8px;flex:1 1 auto">
-        <input type="checkbox" data-ew="notify"${Env.read(NOTIFY, true) ? " checked" : ""}>
-        Enable notifications</label>
+      <div class="o-acts" style="margin-top:0">
         <button type="button" class="o-btn" data-ew-auto title="Watch the export advised for the plan's next run">Auto add</button></div>
-      ${lines ? `<div class="o-scroll"><table><thead><tr><th>Item</th><th class="num">Torn now</th>
+      ${lines ? `<div class="o-scroll"><table><thead><tr><th>Notif.</th><th>Item</th><th class="num">Torn now</th>
         <th class="num">Shop pays</th><th class="num">Margin</th><th class="num">Alert at</th><th></th></tr></thead>
         <tbody>${lines}</tbody></table></div>` : '<div class="o-empty">No export watch yet.</div>'}
       <div class="o-note">Torn now: cheapest of the item market and bazaars (weav3r.dev). Margin total for
@@ -293,16 +293,18 @@ const ExportWatch = (() => {
       form.code = ev.target.value;
       Panel.refresh("exportwatch", true);
     });
-    el.querySelector('[data-ew="notify"]').addEventListener("change", (ev) => {
-      Env.write(NOTIFY, ev.target.checked);
-      paint();
-    });
+    for (const c of el.querySelectorAll("[data-notif]")) {
+      c.addEventListener("change", () => {
+        Env.write(WATCHES, list().map((x) => keyOf(x) === c.dataset.notif ? Object.assign({}, x, { notify: c.checked }) : x));
+        paint();
+      });
+    }
     el.querySelector("[data-ew-auto]").addEventListener("click", autoAdd);
     el.querySelector("[data-ew-add]").addEventListener("click", () => {
       const sel = el.querySelector('[data-ew="id"]');
       const min = Number(el.querySelector('[data-ew="min"]').value);
       if (!sel.value || !(min >= 0)) return;
-      save({ id: Number(sel.value), name: sel.selectedOptions[0].textContent, code: form.code, min });
+      save({ id: Number(sel.value), name: sel.selectedOptions[0].textContent, code: form.code, min, notify: true });
     });
     for (const b of el.querySelectorAll("[data-edit]")) {
       b.addEventListener("click", () => {
