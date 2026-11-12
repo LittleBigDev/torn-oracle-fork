@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.8-fork.26
+// @version      2.6.8-fork.27
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.8 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -9406,7 +9406,7 @@ const ExportWatch = (() => {
     }
     return `<td class="num" style="white-space:nowrap"><input type="number" data-edit-min min="0" step="100"
         value="${Fmt.esc(edit.value)}" style="width:6.5em"> <button type="button" class="o-link" data-edit-ok
-        title="Save" style="display:inline;font-size:inherit;color:var(--o-go)">&#10003;</button></td>`;
+        title="Save" style="display:inline;margin-left:8px;font-size:inherit;color:var(--o-go)">&#10003;</button></td>`;
   }
 
   function render(el) {

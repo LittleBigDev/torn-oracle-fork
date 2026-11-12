@@ -225,7 +225,7 @@ const ExportWatch = (() => {
     }
     return `<td class="num" style="white-space:nowrap"><input type="number" data-edit-min min="0" step="100"
         value="${Fmt.esc(edit.value)}" style="width:6.5em"> <button type="button" class="o-link" data-edit-ok
-        title="Save" style="display:inline;font-size:inherit;color:var(--o-go)">&#10003;</button></td>`;
+        title="Save" style="display:inline;margin-left:8px;font-size:inherit;color:var(--o-go)">&#10003;</button></td>`;
   }
 
   function render(el) {
