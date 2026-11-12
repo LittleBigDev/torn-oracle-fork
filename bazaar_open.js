@@ -1,6 +1,8 @@
 // Fork : page de l'agence, bouton « Open bazaar » à gauche de TRAVEL, affiché seulement si le bazaar
-// existe, contient des objets et est fermé (API v2 user/bazaar). Un clic, une requête :
-// bazaar.php?sid=bazaarData&step=openBazaar (GET, relevé le 12/11/2026 ; fermeture : step=closeBazaar).
+// existe, contient des objets et est fermé. Requêtes relevées le 12/11/2026 (GET, session Torn) :
+// état et contenu : bazaar.php?sid=bazaarData&step=getBazaarContent&ID= (state.isBazaarExists,
+// state.isClosed, totalQuantity ; l'API Torn et weav3r ne voient pas les objets d'un bazaar fermé) ;
+// ouverture, un clic, une requête : step=openBazaar (fermeture : step=closeBazaar).
 const BazaarOpen = (() => {
   "use strict";
 
@@ -13,37 +15,27 @@ const BazaarOpen = (() => {
     return m ? m[1] : "";
   }
 
+  function bazaarData(step) {
+    return fetch("/bazaar.php?sid=bazaarData&step=" + step + "&rfcv=" + rfc(),
+      { credentials: "same-origin", headers: { "X-Requested-With": "XMLHttpRequest" } });
+  }
+
   function travelButton() {
     const btn = document.querySelector('[class*="departPanel"] > button.torn-btn');
     return btn && /^travel$/i.test(btn.textContent.trim()) ? btn : null;
   }
 
-  // Requête de lecture de la page du bazaar ; réponse illisible : on suppose des objets (bouton affiché)
-  async function hasItems() {
-    const uid = (/(?:^|;\s*)uid=(\d+)/.exec(document.cookie || "") || [])[1];
-    try {
-      const res = await fetch("/bazaar.php?sid=bazaarData&step=getBazaarItems&start=0&ID=" + uid
-        + "&order=default&by=asc&categorised=0&limit=1&rfcv=" + rfc(),
-        { credentials: "same-origin", headers: { "X-Requested-With": "XMLHttpRequest" } });
-      const d = await res.json();
-      const n = d && (d.total ?? (Array.isArray(d.list) ? d.list.length : undefined));
-      Env.log.info("bazaar items: " + n);
-      return n === undefined ? true : Number(n) > 0;
-    } catch (err) {
-      return true;
-    }
-  }
-
   async function check() {
-    if (checking || Date.now() - state.at < RECHECK_MS || !Torn.haveKey()) return;
+    if (checking || Date.now() - state.at < RECHECK_MS) return;
     checking = true;
+    let show = false;
     try {
-      const d = await Torn.get("user/bazaar", { ttl: 0 });
-      // Bazaar fermé : l'API renvoie une liste vide, les objets se lisent sur la page du bazaar
-      state = { at: Date.now(), show: !!d.bazaar_exists && !d.bazaar_is_open && await hasItems() };
+      const d = await (await bazaarData("getBazaarContent&ID=")).json();
+      show = !!(d.state && d.state.isBazaarExists && d.state.isClosed) && Number(d.totalQuantity) > 0;
     } catch (err) {
-      state = { at: Date.now(), show: false };
+      Env.log.warn("bazaar state failed", err.message);
     } finally {
+      state = { at: Date.now(), show };
       checking = false;
     }
     paint();
@@ -52,8 +44,7 @@ const BazaarOpen = (() => {
   async function open(btn) {
     btn.disabled = true;
     try {
-      const res = await fetch("/bazaar.php?sid=bazaarData&step=openBazaar&rfcv=" + rfc(),
-        { credentials: "same-origin", headers: { "X-Requested-With": "XMLHttpRequest" } });
+      const res = await bazaarData("openBazaar");
       if (!res.ok) throw new Error("HTTP " + res.status);
       state = { at: Date.now(), show: false };
       btn.remove();
