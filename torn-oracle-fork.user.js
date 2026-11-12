@@ -8287,7 +8287,7 @@ const Assist = (() => {
     return res;
   }
 
-  async function packItem(ref) {
+  async function packItem(ref, fill) {
     const found = await travelData("searchItem", { method: "POST", form: { q: ref.name } });
     const list = found.data && Array.isArray(found.data.list) ? found.data.list : [];
     const named = list.filter((e) => e && e.name === ref.name && !e.disabled);
@@ -8297,7 +8297,7 @@ const Assist = (() => {
     const body = { itemID: hit.id };
     if (hit.armouryID) body.armouryID = hit.armouryID;
     if (hit.faction) body.factionItem = "1";
-    return travelData("addSlotItem", { method: "POST", body });
+    return travelData(fill ? "fillSlotItems" : "addSlotItem", { method: "POST", body });
   }
 
   // Fork : vente à l'étranger (requête relevée le 03/11/2026 : step=sellItem, {slotID, amount}).
@@ -8316,7 +8316,7 @@ const Assist = (() => {
 
   const ACTIONS = {
     sell: (d) => sellItem(d.ref),
-    pack: (d) => packItem(d.ref),
+    pack: (d) => packItem(d.ref, d.fill),
     use: (d) => useItem(d.ref),
     buy: (d) => travelData("buy", { query: "&itemID=" + d.ref.id + "&amount=" + d.amount }),
     fly: () => travelData("travelHome", { method: "POST" }),
@@ -8415,6 +8415,9 @@ const Assist = (() => {
         if (have < n) {
           if (f.room !== null && f.room <= 0) {
             return { label: "Your bag is full", note: "No room for " + ref.name + "." };
+          }
+          if (f.room !== null && f.room > 1 && n - have >= f.room) {
+            return { act: "pack", ref, fill: true, label: "Fill " + ref.name + " (" + f.room + " slots)" };
           }
           return { act: "pack", ref, label: "Pack " + ref.name + " (" + (have + 1) + " of " + n + ")" };
         }

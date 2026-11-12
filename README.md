@@ -18,6 +18,8 @@ The Shops tab has a **Sell** column showing that channel (Traders, Item market, 
 
 **Assist** tab: when the self-hosp or a med-out item can't be packed because none is left in your inventory, the error message links to that item on the item market.
 
+**Assist** tab, **Fill** button: when an item still to pack needs at least as many units as you have free slots, the button becomes "Fill <item> (N slots)" and fills every free slot in one click, with the same single request as Torn's own FILL button.
+
 **Assist** tab, **Auto add** button under "Other items to pack": packs the export advised for the plan's next run (Plan tab, "Take N x item +profit"), N of them, and adds it to "Packed items to sell" so Assist sells it when you land. An item packed for an earlier run stays in the kit until you remove it. On the **Plan** tab, the **add to pack** link next to "Take N x item +profit" does the same for that run's country and opens the Assist tab.
 
 **Assist** tab, **Packed items to sell** list: items from "Other items to pack" to sell as soon as you land, before you self-hosp. While one of them is still in your suitcase, the button stays hidden during the flight, then offers "Sell <item>" once you land, one item after another in list order. Once everything is sold, the button goes back to its normal behavior (self-hosp, restock, buy, fly home).
@@ -61,6 +63,8 @@ Onglet **Export watch** : un objet, un pays, une marge minimale par unité. Tout
 ### Objets à vendre à l'arrivée
 
 Onglet **Assist** : quand l'objet de self-hosp ou de med-out ne peut pas être rangé dans la valise faute d'en avoir dans l'inventaire, le message d'erreur donne le lien vers cet objet sur l'item market.
+
+Onglet **Assist**, bouton **Fill** : quand il reste à ranger au moins autant d'unités d'un objet que de places libres, le bouton devient « Fill <objet> (N slots) » et remplit toutes les places en un clic, avec la même requête unique que le bouton FILL de Torn.
 
 Onglet **Assist**, bouton **Auto add** sous « Other items to pack » : range dans le kit l'export conseillé pour la prochaine étape du plan (onglet Plan, « Take N x objet +profit »), en N exemplaires, et l'ajoute à « Packed items to sell » pour qu'Assist le vende à l'arrivée. L'objet d'une étape précédente reste dans le kit tant qu'on ne le retire pas. Dans l'onglet **Plan**, le lien **add to pack** à côté de « Take N x objet +profit » fait la même chose pour le pays de cette étape et ouvre l'onglet Assist.
 
