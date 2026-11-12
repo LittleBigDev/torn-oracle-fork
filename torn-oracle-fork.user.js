@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.9-fork.6
+// @version      2.6.9-fork.7
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.9 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
@@ -8797,6 +8797,12 @@ const Assist = (() => {
 
     if (f.mode === "flight") {
       if (!kit.hosp || !f.outbound) return null;
+      // Sac pas lisible en vol : la liste des exports notée à l'agence suffit
+      const exports = toSell ? selling.map((x) => x.n + " " + x.ref.name)
+        : !f.carried ? (f.sell || []).map((r) => r.name) : [];
+      if (exports.length) {
+        return { label: "Sell on landing", note: exports.join(", ") + " to sell first, then self-hosp." };
+      }
       if (f.hospUsed) return { label: "Self-hosp used", note: "You land in hospital." };
       if (f.carried && !count(kit.hosp)) return null;
       return { act: "use", ref: kit.hosp, label: "Self-hosp",
