@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.9-fork.8
+// @version      2.6.10-fork
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.9 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (traders Wardogs, item market, ville), alerte d'export sur toutes les pages.
+// @description  Fork de Torn Oracle: Travel 2.6.10 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (bazaar, ville), alerte d'export sur toutes les pages.
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -278,19 +278,23 @@ const Data = (() => {
     return Math.round(c.minutes[0] * t.mult);
   }
 
-  // Fork : taux des traders Wardogs par objet (généré par maj.py) : plancher du bazaar = taux traders + 2 points (Car : 92 %)
-  const TAUX_TRADERS = {"9mm Uzi": 0.82, "AK-47": 0.82, "African Violet": 1.0, "Afro Comb": 0.27, "Aluminum Plate": 0.92, "Ambergris Lump": 0.27, "ArmaLite M-15A4": 0.82, "Axe": 0.82, "BT MP9": 0.82, "Banana Orchid": 1.0, "Basalt Point": 0.92, "Bear Gall": 0.27, "Bearer Bond": 0.27, "Bikini": 0.27, "Blowgun": 0.82, "Bo Staff": 0.82, "Bolt Cutters": 0.92, "Bonded Latex": 0.92, "Bottle of Sake": 0.97, "Bottle of Tequila": 0.97, "Bushmaster Carbon 15": 0.82, "Camel Plushie": 1.0, "Cannabis": 0.97, "Card Skimmer": 0.92, "Ceibo Flower": 1.0, "Chain Whip": 0.82, "Chalcedony Point": 0.92, "Chamois Plushie": 1.0, "Cherry Blossom": 1.0, "Chert Point": 0.92, "Chopsticks": 0.27, "Claymore Mine": 0.97, "Claymore Sword": 0.82, "Cobra Derringer": 0.82, "Coconut Bra": 0.27, "Combat Boots": 0.82, "Combat Gloves": 0.82, "Combat Helmet": 0.82, "Combat Pants": 0.82, "Combat Vest": 0.82, "Compass": 0.27, "Counterfeit Manga": 0.27, "Crazy Straw": 0.27, "Cricket Bat": 0.82, "Crocus": 1.0, "Crossbow": 0.82, "Dahlia": 1.0, "Dart Board": 0.27, "Desert Eagle": 0.82, "Diamond Bladed Knife": 0.82, "Diving Gloves": 0.27, "Dog Treats": 0.92, "Dozen White Roses": 1.0, "Ecstasy": 0.97, "Edelweiss": 1.0, "Elephant Statue": 0.27, "Enfield SA-80": 0.82, "Ephedrine Powder": 0.27, "Ergotamine Ampoule": 0.27, "Fire Hydrant": 0.27, "Fireworks": 0.97, "Flail": 0.82, "Flak Jacket": 0.82, "Flamethrower": 0.82, "Flare Gun": 0.82, "Flash Grenade": 0.97, "Flexible Body Armor": 0.82, "Flippers": 0.27, "Frying Pan": 0.82, "Glow Stick": 0.92, "Gold Laptop": 0.92, "Gold Plated AK-47": 0.82, "Grenade": 0.97, "Guandao": 0.82, "HEG": 0.97, "Handbag": 0.82, "Harpoon": 0.82, "Heather": 1.0, "Heckler & Koch SL8": 0.82, "Hockey Stick": 0.27, "Hydrochloric Acid": 0.92, "Ice Pick": 0.82, "Inkwell": 0.92, "Insulin": 0.27, "Ithaca 37": 0.82, "Jackhammer": 0.82, "Jade Buddha": 0.27, "Jaguar Plushie": 1.0, "Kabuki Mask": 0.27, "Kama": 0.82, "Katana": 0.82, "Ketamine": 0.97, "Kevlar Gloves": 0.82, "Knuckle Dusters": 0.82, "Kodachi": 0.82, "LSD": 0.97, "Large Suitcase": 0.92, "Leather Bullwhip": 0.82, "Lighter": 0.92, "Lion Plushie": 1.0, "Liquid Body Armor": 0.82, "Lorcin 380": 0.82, "M249 SAW": 0.82, "Macana": 0.82, "Mag 7": 0.82, "Magnesium Shavings": 0.92, "Maneki Neko": 0.27, "Mayan Statue": 0.27, "Medium Suitcase": 0.92, "Metal Nunchaku": 0.82, "Meteorite Fragment": 0.92, "Minigun": 0.82, "Model Space Ship": 0.27, "Monkey Plushie": 1.0, "Mountie Hat": 0.27, "Natural Pearls": 0.27, "Naval Cutlass": 0.82, "Nessie Plushie": 1.0, "Neumune Tablet": 0.92, "Ninja Claws": 0.82, "Ninja Star": 0.97, "Nodding Turtle": 0.27, "Obsidian Point": 0.92, "Opium": 0.97, "Orchid": 1.0, "Outer Tactical Vest": 0.82, "PCP": 0.97, "PVC Cards": 0.92, "Panda Plushie": 1.0, "Pangolin Scales": 0.27, "Paper Weight": 0.27, "Patagonian Fossil": 0.92, "Pele Charm": 0.27, "Peony": 1.0, "Pink Mac-10": 0.82, "Potassium Nitrate": 0.92, "Printing Paper": 0.92, "Proda Sunglasses": 0.27, "Qsz-92": 0.82, "Quartz Point": 0.92, "Quartzite Point": 0.92, "Raw Ivory": 0.27, "Red Fox Plushie": 1.0, "SIG 552": 0.82, "SKS Carbine": 0.82, "Safety Boots": 0.82, "Safrole Oil": 0.27, "Sai": 0.82, "Samurai Sword": 0.82, "Sensu": 0.27, "Sextant": 0.27, "Shark Fin": 0.27, "Ship in a Bottle": 0.27, "Shrooms": 0.97, "Small Suitcase": 0.92, "Smoke Grenade": 0.97, "Snorkel": 0.27, "Snowboard": 0.27, "Soccer Ball": 0.27, "Spear": 0.82, "Speed": 0.97, "Speedo": 0.27, "Sports Shades": 0.27, "Sports Sneakers": 0.92, "Springfield 1911": 0.82, "Steel Drum": 0.27, "Stick Grenade": 0.97, "Stick of Dynamite": 0.92, "Stingray Plushie": 1.0, "Sumo Doll": 0.27, "Swiss Army Knife": 0.82, "Tailor's Dummy": 0.27, "Taser": 0.82, "Taurus PT92": 0.82, "Tavor TAR-21": 0.82, "Tear Gas": 0.97, "Throwing Knife": 0.97, "Tiger Bone Powder": 0.27, "Trench Coat": 0.27, "Tribulus Omanense": 1.0, "Trout": 0.97, "Turtle Shell": 0.27, "Twin Tiger Hooks": 0.82, "Type 98 Anti Tank": 0.82, "Uncut Diamonds": 0.27, "Vektor CR-21": 0.82, "Vicodin": 0.97, "WWII Helmet": 0.82, "Wetsuit": 0.27, "Whale Meat": 0.27, "Wolverine Plushie": 1.0, "Wooden Nunchaku": 0.82, "Wushu Double Axes": 0.82, "Xanax": 0.97, "Yakitori Lantern": 0.27, "Yucca Plant": 0.27, "Zip Ties": 0.92};
+  // Fork : taux du bazaar par objet (généré par maj.py) : taux traders Wardogs de la catégorie + 2 points (Car : 92 %)
+  const TAUX_BAZAAR = {"9mm Uzi": 0.82, "AK-47": 0.82, "African Violet": 1.0, "Afro Comb": 0.27, "Aluminum Plate": 0.92, "Ambergris Lump": 0.27, "ArmaLite M-15A4": 0.82, "Axe": 0.82, "BT MP9": 0.82, "Banana Orchid": 1.0, "Basalt Point": 0.92, "Bear Gall": 0.27, "Bearer Bond": 0.27, "Bikini": 0.27, "Blowgun": 0.82, "Bo Staff": 0.82, "Bolt Cutters": 0.92, "Bonded Latex": 0.92, "Bottle of Sake": 0.97, "Bottle of Tequila": 0.97, "Bushmaster Carbon 15": 0.82, "Camel Plushie": 1.0, "Cannabis": 0.97, "Card Skimmer": 0.92, "Ceibo Flower": 1.0, "Chain Whip": 0.82, "Chalcedony Point": 0.92, "Chamois Plushie": 1.0, "Cherry Blossom": 1.0, "Chert Point": 0.92, "Chopsticks": 0.27, "Claymore Mine": 0.97, "Claymore Sword": 0.82, "Cobra Derringer": 0.82, "Coconut Bra": 0.27, "Combat Boots": 0.82, "Combat Gloves": 0.82, "Combat Helmet": 0.82, "Combat Pants": 0.82, "Combat Vest": 0.82, "Compass": 0.27, "Counterfeit Manga": 0.27, "Crazy Straw": 0.27, "Cricket Bat": 0.82, "Crocus": 1.0, "Crossbow": 0.82, "Dahlia": 1.0, "Dart Board": 0.27, "Desert Eagle": 0.82, "Diamond Bladed Knife": 0.82, "Diving Gloves": 0.27, "Dog Treats": 0.92, "Dozen White Roses": 1.0, "Ecstasy": 0.97, "Edelweiss": 1.0, "Elephant Statue": 0.27, "Enfield SA-80": 0.82, "Ephedrine Powder": 0.27, "Ergotamine Ampoule": 0.27, "Fire Hydrant": 0.27, "Fireworks": 0.97, "Flail": 0.82, "Flak Jacket": 0.82, "Flamethrower": 0.82, "Flare Gun": 0.82, "Flash Grenade": 0.97, "Flexible Body Armor": 0.82, "Flippers": 0.27, "Frying Pan": 0.82, "Glow Stick": 0.92, "Gold Laptop": 0.92, "Gold Plated AK-47": 0.82, "Grenade": 0.97, "Guandao": 0.82, "HEG": 0.97, "Handbag": 0.82, "Harpoon": 0.82, "Heather": 1.0, "Heckler & Koch SL8": 0.82, "Hockey Stick": 0.27, "Hydrochloric Acid": 0.92, "Ice Pick": 0.82, "Inkwell": 0.92, "Insulin": 0.27, "Ithaca 37": 0.82, "Jackhammer": 0.82, "Jade Buddha": 0.27, "Jaguar Plushie": 1.0, "Kabuki Mask": 0.27, "Kama": 0.82, "Katana": 0.82, "Ketamine": 0.97, "Kevlar Gloves": 0.82, "Knuckle Dusters": 0.82, "Kodachi": 0.82, "LSD": 0.97, "Large Suitcase": 0.92, "Leather Bullwhip": 0.82, "Lighter": 0.92, "Lion Plushie": 1.0, "Liquid Body Armor": 0.82, "Lorcin 380": 0.82, "M249 SAW": 0.82, "Macana": 0.82, "Mag 7": 0.82, "Magnesium Shavings": 0.92, "Maneki Neko": 0.27, "Mayan Statue": 0.27, "Medium Suitcase": 0.92, "Metal Nunchaku": 0.82, "Meteorite Fragment": 0.92, "Minigun": 0.82, "Model Space Ship": 0.27, "Monkey Plushie": 1.0, "Mountie Hat": 0.27, "Natural Pearls": 0.27, "Naval Cutlass": 0.82, "Nessie Plushie": 1.0, "Neumune Tablet": 0.92, "Ninja Claws": 0.82, "Ninja Star": 0.97, "Nodding Turtle": 0.27, "Obsidian Point": 0.92, "Opium": 0.97, "Orchid": 1.0, "Outer Tactical Vest": 0.82, "PCP": 0.97, "PVC Cards": 0.92, "Panda Plushie": 1.0, "Pangolin Scales": 0.27, "Paper Weight": 0.27, "Patagonian Fossil": 0.92, "Pele Charm": 0.27, "Peony": 1.0, "Pink Mac-10": 0.82, "Potassium Nitrate": 0.92, "Printing Paper": 0.92, "Proda Sunglasses": 0.27, "Qsz-92": 0.82, "Quartz Point": 0.92, "Quartzite Point": 0.92, "Raw Ivory": 0.27, "Red Fox Plushie": 1.0, "SIG 552": 0.82, "SKS Carbine": 0.82, "Safety Boots": 0.82, "Safrole Oil": 0.27, "Sai": 0.82, "Samurai Sword": 0.82, "Sensu": 0.27, "Sextant": 0.27, "Shark Fin": 0.27, "Ship in a Bottle": 0.27, "Shrooms": 0.97, "Small Suitcase": 0.92, "Smoke Grenade": 0.97, "Snorkel": 0.27, "Snowboard": 0.27, "Soccer Ball": 0.27, "Spear": 0.82, "Speed": 0.97, "Speedo": 0.27, "Sports Shades": 0.27, "Sports Sneakers": 0.92, "Springfield 1911": 0.82, "Steel Drum": 0.27, "Stick Grenade": 0.97, "Stick of Dynamite": 0.92, "Stingray Plushie": 1.0, "Sumo Doll": 0.27, "Swiss Army Knife": 0.82, "Tailor's Dummy": 0.27, "Taser": 0.82, "Taurus PT92": 0.82, "Tavor TAR-21": 0.82, "Tear Gas": 0.97, "Throwing Knife": 0.97, "Tiger Bone Powder": 0.27, "Trench Coat": 0.27, "Tribulus Omanense": 1.0, "Trout": 0.97, "Turtle Shell": 0.27, "Twin Tiger Hooks": 0.82, "Type 98 Anti Tank": 0.82, "Uncut Diamonds": 0.27, "Vektor CR-21": 0.82, "Vicodin": 0.97, "WWII Helmet": 0.82, "Wetsuit": 0.27, "Whale Meat": 0.27, "Wolverine Plushie": 1.0, "Wooden Nunchaku": 0.82, "Wushu Double Axes": 0.82, "Xanax": 0.97, "Yakitori Lantern": 0.27, "Yucca Plant": 0.27, "Zip Ties": 0.92};
   const BOUTIQUES = {"9mm Uzi": "Big Al's Gun Shop", "AK-47": "Big Al's Gun Shop", "African Violet": "Bits 'n' Bobs", "Afro Comb": "Recycling Center", "Ambergris Lump": "Jewelry Store", "ArmaLite M-15A4": "Big Al's Gun Shop", "Axe": "Big Al's Gun Shop", "BT MP9": "Big Al's Gun Shop", "Banana Orchid": "Bits 'n' Bobs", "Bear Gall": "Nikeh Sports", "Bearer Bond": "Pawn Shop", "Bikini": "TC Clothing", "Blowgun": "Big Al's Gun Shop", "Bo Staff": "Big Al's Gun Shop", "Bottle of Sake": "Bits 'n' Bobs", "Bottle of Tequila": "Bits 'n' Bobs", "Bushmaster Carbon 15": "Big Al's Gun Shop", "Camel Plushie": "Bits 'n' Bobs", "Ceibo Flower": "Bits 'n' Bobs", "Chain Whip": "Big Al's Gun Shop", "Chamois Plushie": "Bits 'n' Bobs", "Cherry Blossom": "Bits 'n' Bobs", "Chopsticks": "Bits 'n' Bobs", "Claymore Mine": "Big Al's Gun Shop", "Claymore Sword": "Big Al's Gun Shop", "Cobra Derringer": "Big Al's Gun Shop", "Coconut Bra": "TC Clothing", "Combat Boots": "Big Al's Gun Shop", "Combat Gloves": "Big Al's Gun Shop", "Combat Helmet": "Big Al's Gun Shop", "Combat Pants": "Big Al's Gun Shop", "Combat Vest": "Big Al's Gun Shop", "Compass": "Bits 'n' Bobs", "Counterfeit Manga": "Pawn Shop", "Crazy Straw": "Recycling Center", "Cricket Bat": "Big Al's Gun Shop", "Crocus": "Bits 'n' Bobs", "Crossbow": "Big Al's Gun Shop", "Dahlia": "Bits 'n' Bobs", "Dart Board": "Recycling Center", "Desert Eagle": "Big Al's Gun Shop", "Diamond Bladed Knife": "Big Al's Gun Shop", "Diving Gloves": "TC Clothing", "Edelweiss": "Bits 'n' Bobs", "Elephant Statue": "Bits 'n' Bobs", "Enfield SA-80": "Big Al's Gun Shop", "Ephedrine Powder": "Pharmacy", "Ergotamine Ampoule": "Pharmacy", "Fire Hydrant": "Recycling Center", "Fireworks": "Big Al's Gun Shop", "Flail": "Big Al's Gun Shop", "Flak Jacket": "Big Al's Gun Shop", "Flamethrower": "Big Al's Gun Shop", "Flare Gun": "Big Al's Gun Shop", "Flash Grenade": "Big Al's Gun Shop", "Flexible Body Armor": "Big Al's Gun Shop", "Flippers": "TC Clothing", "Frying Pan": "Big Al's Gun Shop", "Grenade": "Big Al's Gun Shop", "Guandao": "Big Al's Gun Shop", "HEG": "Big Al's Gun Shop", "Harpoon": "Big Al's Gun Shop", "Heather": "Bits 'n' Bobs", "Heckler & Koch SL8": "Big Al's Gun Shop", "Hockey Stick": "Bits 'n' Bobs", "Hydrochloric Acid": "Pharmacy", "Ice Pick": "Big Al's Gun Shop", "Insulin": "Pharmacy", "Ithaca 37": "Big Al's Gun Shop", "Jackhammer": "Big Al's Gun Shop", "Jade Buddha": "Recycling Center", "Jaguar Plushie": "Bits 'n' Bobs", "Kabuki Mask": "TC Clothing", "Kama": "Big Al's Gun Shop", "Katana": "Big Al's Gun Shop", "Kevlar Gloves": "Big Al's Gun Shop", "Knuckle Dusters": "Big Al's Gun Shop", "Kodachi": "Big Al's Gun Shop", "Large Suitcase": "Bits 'n' Bobs", "Leather Bullwhip": "Big Al's Gun Shop", "Lion Plushie": "Bits 'n' Bobs", "Liquid Body Armor": "Big Al's Gun Shop", "Lorcin 380": "Big Al's Gun Shop", "M249 SAW": "Big Al's Gun Shop", "Macana": "Big Al's Gun Shop", "Mag 7": "Big Al's Gun Shop", "Maneki Neko": "Recycling Center", "Mayan Statue": "Bits 'n' Bobs", "Medium Suitcase": "Bits 'n' Bobs", "Metal Nunchaku": "Big Al's Gun Shop", "Minigun": "Big Al's Gun Shop", "Model Space Ship": "Recycling Center", "Monkey Plushie": "Bits 'n' Bobs", "Mountie Hat": "TC Clothing", "Natural Pearls": "Jewelry Store", "Naval Cutlass": "Big Al's Gun Shop", "Nessie Plushie": "Bits 'n' Bobs", "Neumune Tablet": "Pharmacy", "Ninja Claws": "Big Al's Gun Shop", "Ninja Star": "Big Al's Gun Shop", "Nodding Turtle": "Recycling Center", "Orchid": "Bits 'n' Bobs", "Outer Tactical Vest": "Big Al's Gun Shop", "Panda Plushie": "Bits 'n' Bobs", "Pangolin Scales": "Nikeh Sports", "Paper Weight": "Bits 'n' Bobs", "Pele Charm": "Bits 'n' Bobs", "Peony": "Bits 'n' Bobs", "Proda Sunglasses": "TC Clothing", "Qsz-92": "Big Al's Gun Shop", "Raw Ivory": "Pawn Shop", "Red Fox Plushie": "Bits 'n' Bobs", "SIG 552": "Big Al's Gun Shop", "SKS Carbine": "Big Al's Gun Shop", "Safety Boots": "Big Al's Gun Shop", "Safrole Oil": "Pharmacy", "Sai": "Big Al's Gun Shop", "Samurai Sword": "Big Al's Gun Shop", "Sensu": "Bits 'n' Bobs", "Sextant": "Recycling Center", "Shark Fin": "Nikeh Sports", "Ship in a Bottle": "Recycling Center", "Small Suitcase": "Bits 'n' Bobs", "Smoke Grenade": "Big Al's Gun Shop", "Snorkel": "TC Clothing", "Snowboard": "Recycling Center", "Soccer Ball": "Bits 'n' Bobs", "Spear": "Big Al's Gun Shop", "Speedo": "TC Clothing", "Sports Shades": "TC Clothing", "Springfield 1911": "Big Al's Gun Shop", "Steel Drum": "Recycling Center", "Stick Grenade": "Big Al's Gun Shop", "Stingray Plushie": "Bits 'n' Bobs", "Sumo Doll": "Bits 'n' Bobs", "Swiss Army Knife": "Big Al's Gun Shop", "Tailor's Dummy": "Recycling Center", "Taser": "Big Al's Gun Shop", "Taurus PT92": "Big Al's Gun Shop", "Tavor TAR-21": "Big Al's Gun Shop", "Tear Gas": "Big Al's Gun Shop", "Throwing Knife": "Big Al's Gun Shop", "Tiger Bone Powder": "Nikeh Sports", "Trench Coat": "TC Clothing", "Tribulus Omanense": "Bits 'n' Bobs", "Trout": "Big Al's Gun Shop", "Turtle Shell": "Jewelry Store", "Twin Tiger Hooks": "Big Al's Gun Shop", "Type 98 Anti Tank": "Big Al's Gun Shop", "Uncut Diamonds": "Jewelry Store", "Vektor CR-21": "Big Al's Gun Shop", "WWII Helmet": "Big Al's Gun Shop", "Wetsuit": "TC Clothing", "Whale Meat": "Nikeh Sports", "Wolverine Plushie": "Bits 'n' Bobs", "Wooden Nunchaku": "Big Al's Gun Shop", "Wushu Double Axes": "Big Al's Gun Shop", "Yakitori Lantern": "Recycling Center", "Yucca Plant": "Recycling Center"};
 
-  function unitSell(marketValue, sellPrice, sellTo, name) {
-    const best = Math.max((marketValue || 0) * (TAUX_TRADERS[name] ?? 0.27), sellPrice || 0);
-    return best > 0 ? best : null;
+  // Canal retenu par unitSell selon le réglage Sell to : boutique de la ville ou bazaar
+  function channel(marketValue, sellPrice, name) {
+    const sell = unitSell(marketValue, sellPrice, Settings.get("sell_to"), name);
+    if (sell === null) return null;
+    return sell === sellPrice ? BOUTIQUES[name] || "City" : "Bazaar";
   }
 
-  function channel(marketValue, sellPrice, name) {
-    const best = unitSell(marketValue, sellPrice, null, name);
-    if (best === null) return null;
-    return best === (sellPrice || 0) ? BOUTIQUES[name] || "City" : "Bazaar";
+  function unitSell(marketValue, sellPrice, sellTo, name) {
+    const city = sellPrice > 0 ? sellPrice : null;
+    if (sellTo === "city") return city;
+    const players = marketValue > 0 ? marketValue * (TAUX_BAZAAR[name] ?? 0.27) : null;
+    if (sellTo === "best" && city !== null) return players === null ? city : Math.max(city, players);
+    return players;
   }
 
   function margin(marketValue, sellPrice, cost, sellTo, name) {
@@ -410,12 +414,12 @@ const Settings = (() => {
     { name: "max_cost", group: "buying", kind: "int", def: 0, min: 0, unit: "$", sync: "max_cost",
       label: "Highest price per item",
       help: "0 means no limit." },
-    { name: "sell_to", group: "buying", kind: "choice", def: "players", sync: "sell_to",
-      choices: () => [["players", "Players"], ["city", "City shops"]],
+    { name: "sell_to", group: "buying", kind: "choice", def: "best", sync: "sell_to",
+      choices: () => [["players", "Players"], ["city", "City shops"], ["best", "Best price"]],
       label: "Sell to",
-      help: "Plans focus on items that are profitable when sold to players or to city shops." },
+      help: "Plans focus on items that are profitable when sold to players or to city shops. Best price counts each item at whichever pays more." },
     { name: "haircut_pct", group: "buying", kind: "number", def: 5, min: 0, max: 99, step: 0.5,
-      unit: "%", sync: "haircut_pct", showIf: () => Settings.get("sell_to") !== "city",
+      unit: "%", sync: "haircut_pct", showIf: () => false,  /* Fork : décote remplacée par le taux du bazaar de chaque objet */
       label: "Sell under market by",
       help: "Profit is counted at this discount to market value." },
 
@@ -450,13 +454,15 @@ const Settings = (() => {
       help: "Sends the stock and prices of the foreign shop you are viewing to Torn Oracle for restock times. Readings are stored without your name. The account that sent them is kept for 14 days." },
 
     { name: "assist_kit", group: "assist", kind: "kit", hidden: true, sync: "assist_kit",
-      def: { hosp: null, med: null, meds: 0, extras: [] },
+      def: { hosp: null, hosps: 1, med: null, meds: 0, extras: [] },
       label: "Trip kit" },
     { name: "assist_track", group: "assist", kind: "itemrefs", def: [], hidden: true,
       sync: "assist_track", label: "Tracked items" },
 
     { name: "assist_auto_track", group: "assist", kind: "bool", def: false, hidden: true,
       label: "Track the best items" },
+    { name: "assist_best_n", group: "assist", kind: "int", def: 2, min: 1, max: 10, hidden: true,
+      label: "How many best items" },
     { name: "assist_export", group: "assist", kind: "bool", def: false, hidden: true,
       label: "Pack the best export" },
 
@@ -564,6 +570,7 @@ const Settings = (() => {
       case "kit": {
         if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
         const meds = Math.round(Number(raw.meds));
+        const hosps = raw.hosps === undefined ? 1 : Math.round(Number(raw.hosps));
         const extras = [];
         for (const e of Array.isArray(raw.extras) ? raw.extras : []) {
           const ref = itemRef(e);
@@ -571,7 +578,9 @@ const Settings = (() => {
           if (!ref || !(n >= 1) || extras.some((x) => x.id === ref.id)) continue;
           extras.push(Object.assign(ref, { n: Math.min(n, MAX_EXTRA_COUNT) }));
         }
-        return { hosp: itemRef(raw.hosp), med: itemRef(raw.med),
+        return { hosp: itemRef(raw.hosp),
+                 hosps: isFinite(hosps) ? Math.min(Math.max(hosps, 0), MAX_MEDS) : 1,
+                 med: itemRef(raw.med),
                  meds: isFinite(meds) ? Math.min(Math.max(meds, 0), MAX_MEDS) : 0,
                  extras: extras.slice(0, MAX_EXTRAS) };
       }
@@ -772,7 +781,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.9";
+  const SCRIPT_VERSION = "2.6.10";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -1751,6 +1760,8 @@ const Trip = (() => {
       ambiguous: null,
       baseline: null,
       weakBaseline: false,
+
+      rebaseAt: null,
       shelf: null,
 
       extra: [],
@@ -1908,7 +1919,7 @@ const Trip = (() => {
     return state;
   }
 
-  const LOCAL_ONLY = ["baseline", "weakBaseline", "shelf"];
+  const LOCAL_ONLY = ["baseline", "weakBaseline", "rebaseAt", "shelf"];
   const FIELDS = ["legs", "cursor", "endsAt", "planNote", "createdAt", "shapedAt",
                   "preserved", "offPlan"];
 
@@ -2264,7 +2275,10 @@ const Trip = (() => {
     if (i < 0 || typeof obs.wallet !== "number") return null;
     const rt = s.runtime[i];
     if (rt.boughtQty !== null) return extendBuy(obs, i);
-    if (rt.baseline === null) return null;
+    if (rt.baseline === null) {
+      if (rt.rebaseAt && readAfter(obs, rt)) openBaseline(obs.wallet);
+      return null;
+    }
 
     const drop = rt.baseline - obs.wallet;
     if (drop <= 0) return null;
@@ -2301,7 +2315,7 @@ const Trip = (() => {
     if (!(item.cost > 0)) return null;
     if (rt.baseline === null) {
 
-      openBaseline(obs.wallet);
+      if (readAfter(obs, rt)) openBaseline(obs.wallet);
       return null;
     }
     const drop = rt.baseline - obs.wallet;
@@ -2317,6 +2331,59 @@ const Trip = (() => {
     rt.weakBaseline = false;
     journal("bought", k + " more " + item.name + ", " + rt.boughtQty + " in the case.");
     return { kind: "bought", leg: s_leg(i), units: k, total: rt.boughtQty, more: true };
+  }
+
+  const readAfter = (obs, rt) => (obs.at || Date.now()) > (rt.rebaseAt || 0);
+
+  function walletMoved() {
+    const i = currentIndex();
+    if (i < 0) return;
+    const rt = get().runtime[i];
+    if (rt.status !== "abroad") return;
+    rt.baseline = null;
+    rt.weakBaseline = false;
+    rt.rebaseAt = Date.now();
+    save();
+  }
+
+  function pageBuy(ref, units, cost) {
+    const s = get();
+    const i = currentIndex();
+    if (i < 0 || !(units > 0) || !(cost > 0)) return null;
+    const rt = s.runtime[i];
+    if (rt.status !== "abroad") return null;
+    const leg = s.legs[i];
+    const entry = (rt.shelf || []).find((r) => r.itemId === ref.id);
+    const sell = entry ? Data.unitSell(entry.value, entry.sell, Settings.get("sell_to"), entry.name) : null;
+    const booked = rt.boughtQty > 0 ? boughtItem(i) : null;
+    if (!booked) {
+      if (ref.id === leg.item_id) {
+        rt.item = null;
+        rt.paidCost = cost;
+      } else if (sell === null) {
+        return ask(i, null, units, { itemId: ref.id, name: ref.name, units });
+      } else {
+        rt.item = { id: ref.id, name: ref.name, cost, margin: sell - cost,
+                    swappedFrom: leg.item_name };
+      }
+      rt.boughtQty = units;
+    } else if (booked.id === ref.id) {
+      rt.boughtQty += units;
+    } else {
+      rt.extra = extras(rt).slice();
+      const more = rt.extra.find((e) => e.id === ref.id);
+      if (more) more.units += units;
+      else rt.extra.push({ id: ref.id, name: ref.name, cost, margin: sell === null ? 0 : sell - cost, units });
+    }
+    const item = boughtItem(i);
+    rt.spend = rt.boughtQty * item.cost + extras(rt).reduce((n, e) => n + e.units * e.cost, 0);
+    rt.ambiguous = null;
+    rt.baseline = null;
+    rt.weakBaseline = false;
+    rt.rebaseAt = Date.now();
+    journal("bought", units + "x " + ref.name + " bought.");
+    save();
+    return { kind: "bought", leg: s_leg(i), units, item: ref.name };
   }
 
   function record(i, units, priceOverride, obs) {
@@ -2510,7 +2577,7 @@ const Trip = (() => {
     load, save, sync, get, blank,
     adopt, replaceTail, stop, started, dayOver, flownCount, shared, applyShared, sameLeg,
     revision: () => revision,
-    apply, phaseOf, setBuy, boughtItem, extras, unitsBought, marginBought,
+    apply, phaseOf, setBuy, pageBuy, walletMoved, boughtItem, extras, unitsBought, marginBought,
     legCountry, shelfFor, shelfOptions, carryable,
     legs, currentLeg, currentIndex,
     lateness, staleFor, isStale, position, racing, earliestHome, canReplan, value,
@@ -3629,7 +3696,13 @@ function plannerCore() {
       if (it.cost === null || it.cost === undefined) continue;
 
       const city = cfg.sellTo === "city";
-      const value = city ? it.sell_price : it.market_value;
+      // Fork : bazaar au taux de la catégorie (taux traders Wardogs + 2 points, Car 92 %), pas la décote unique
+      const BAZAAR = {"flower": 1.0, "plushie": 1.0, "temporary": 0.97, "drug": 0.97, "alcohol": 0.97, "candy": 0.97, "booster": 0.97, "energy drink": 0.97, "supply pack": 0.97, "tool": 0.92, "material": 0.92, "medical": 0.92, "enhancer": 0.92, "special": 0.92, "artifact": 0.92, "car": 0.92, "defensive": 0.82, "primary": 0.82, "secondary": 0.82, "melee": 0.82, "jewelry": 0.82, "clothing": 0.27, "other": 0.27};
+      const players = it.market_value > 0
+        ? it.market_value * (BAZAAR[(it.type || "").trim().toLowerCase()] ?? 0.27) : null;
+      const value = city ? it.sell_price
+        : cfg.sellTo === "best" ? Math.max(it.sell_price > 0 ? it.sell_price : 0, players || 0)
+        : it.market_value;
       if (!value || value <= 0) continue;
       if (cfg.maxCost !== null && it.cost > cfg.maxCost) continue;
       const type = (it.type || "").trim().toLowerCase();
@@ -3638,10 +3711,7 @@ function plannerCore() {
       if (cfg.excludeTypes && cfg.excludeTypes.indexOf(type) !== -1) continue;
       if (cfg.excludeItems && cfg.excludeItems.indexOf(it.item_id) !== -1) continue;
 
-      // Fork : meilleur canal, bazaar (plancher : taux traders Wardogs de la catégorie + 2 points, Car 92 %) ou ville
-      const TRADERS = {"flower": 1.0, "plushie": 1.0, "temporary": 0.97, "drug": 0.97, "alcohol": 0.97, "candy": 0.97, "booster": 0.97, "energy drink": 0.97, "supply pack": 0.97, "tool": 0.92, "material": 0.92, "medical": 0.92, "enhancer": 0.92, "special": 0.92, "artifact": 0.92, "car": 0.92, "defensive": 0.82, "primary": 0.82, "secondary": 0.82, "melee": 0.82, "jewelry": 0.82, "clothing": 0.27, "other": 0.27};
-      const mv = it.market_value || 0;
-      const margin = Math.max(mv * (TRADERS[type] ?? 0.27), it.sell_price || 0) - it.cost;
+      const margin = city || cfg.sellTo === "best" ? value - it.cost : players - it.cost;
       if (margin <= 0 || margin < cfg.minMargin) continue;
 
       const windows = [];
@@ -4567,6 +4637,15 @@ const Style = (() => {
 #oracle-panel .o-flash.is-bad { background: var(--o-bad-soft); color: var(--o-bad); }
 #oracle-panel .o-flash > span { flex: 1 1 auto; min-width: 0; }
 #oracle-panel .o-flash button.o-icon { color: inherit; padding: 2px 4px; line-height: 1; font-size: 15px; }
+#oracle-tip {
+  position: fixed; z-index: 2147483000; max-width: 260px; pointer-events: none;
+  padding: 5px 8px; border-radius: 6px; border: 1px solid #dde3e9;
+  background: #ffffff; color: #10161c;
+  font: 11px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+#oracle-tip.o-dark { background: #1e262f; color: #e7edf3; border-color: #2c3742; }
+#oracle-tip[hidden] { display: none; }
 @keyframes o-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
 
 #oracle-panel .o-now {
@@ -5259,7 +5338,13 @@ const Fmt = (() => {
       + `<span class="warn">below target</span></span>`;
   }
 
-  return { esc, clock, countdown, ago, duration, money, price, count, pct, hitPct, bestLanding,
+  const DISCORD_URL = "https://discord.gg/uCkYscEJzr";
+  const discord = () =>
+    `<a class="o-out" href="${DISCORD_URL}" target="_blank" rel="noopener">Discord</a>`;
+
+  const linkDiscord = (html) => html.replace(/\bon Discord\b/, "on " + discord());
+
+  return { discord, linkDiscord, esc, clock, countdown, ago, duration, money, price, count, pct, hitPct, bestLanding,
            plural, board, restock, tickLive, STALE_SHELF_MS };
 })();
 
@@ -5359,6 +5444,7 @@ const Panel = (() => {
       bodyEl.appendChild(pane);
     }
 
+    wireTips();
     if (Oracle.updateDue()) showUpdate();
     paintNews();
     applyCollapsed(Settings.get("collapsed"));
@@ -5387,6 +5473,55 @@ const Panel = (() => {
     if (!root) return;
     root.classList.toggle("o-dark", Page.darkMode());
     root.classList.toggle("o-minimal", Settings.get("minimal") === true);
+  }
+
+  let tipEl = null;
+  let tipFor = null;
+
+  function hideTip() {
+    tipFor = null;
+    if (tipEl) tipEl.hidden = true;
+  }
+
+  function showTip(anchor) {
+    if (!tipEl) {
+      tipEl = document.createElement("div");
+      tipEl.id = "oracle-tip";
+      tipEl.setAttribute("role", "tooltip");
+      document.body.appendChild(tipEl);
+    }
+    tipEl.classList.toggle("o-dark", root.classList.contains("o-dark"));
+    tipFor = anchor;
+    tipEl.textContent = anchor.dataset.tip;
+    tipEl.hidden = false;
+    const r = anchor.getBoundingClientRect();
+    const w = tipEl.offsetWidth;
+    const h = tipEl.offsetHeight;
+    const left = Math.max(4, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 4));
+    const top = r.top - h - 6 >= 0 ? r.top - h - 6 : r.bottom + 6;
+    tipEl.style.left = left + "px";
+    tipEl.style.top = top + "px";
+  }
+
+  function wireTips() {
+    root.addEventListener("pointerover", (ev) => {
+      if (ev.pointerType !== "mouse") return;
+      const el = ev.target.closest && ev.target.closest("[title], [data-tip]");
+      if (!el || !root.contains(el)) { if (tipFor) hideTip(); return; }
+      if (el.hasAttribute("title")) {
+        el.dataset.tip = el.getAttribute("title");
+        if (!el.hasAttribute("aria-label") && !el.textContent.trim()) {
+          el.setAttribute("aria-label", el.dataset.tip);
+        }
+        el.removeAttribute("title");
+      }
+      if (el !== tipFor && el.dataset.tip) showTip(el);
+    });
+    root.addEventListener("pointerout", (ev) => {
+      if (tipFor && !tipFor.contains(ev.relatedTarget)) hideTip();
+    });
+    root.addEventListener("pointerdown", hideTip);
+    window.addEventListener("scroll", hideTip, { passive: true, capture: true });
   }
 
   const FLASH_MS = 4000;
@@ -5471,6 +5606,7 @@ const Panel = (() => {
     if (!pane) return;
     if (!force && typingIn(pane)) { pendingRender = true; return; }
     pendingRender = false;
+    hideTip();
     try { current.render(pane); }
     catch (e) { Env.log.error("render " + current.id + " failed", e); }
   }
@@ -5598,6 +5734,7 @@ const Panel = (() => {
     secondTimer = setInterval(() => {
       paintHead();
       expireFlashes();
+      if (tipFor && !tipFor.isConnected) hideTip();
       if (!current || !root || root.classList.contains("o-collapsed")) return;
       const pane = paneFor(current.id);
 
@@ -5624,7 +5761,7 @@ const Gate = (() => {
 
   function account(what, alsoDiscord) {
     const discord = alsoDiscord
-      ? "<p>These arrive on Discord. <b>/register</b> there with your Torn key sets up both.</p>"
+      ? `<p>These arrive on ${Fmt.discord()}. <b>/register</b> there with your Torn key sets up both.</p>`
       : "";
     return `<div class="o-empty">
       <p><b>Sign in to ${Fmt.esc(what)}.</b></p>
@@ -5637,7 +5774,7 @@ const Gate = (() => {
   function discord(what) {
     return `<div class="o-empty">
       <p><b>${Fmt.esc(what)} arrive on Discord.</b></p>
-      <p>Link your account first: run <b>/register</b> on Discord with the same Torn key.</p>
+      <p>Link your account first: run <b>/register</b> on ${Fmt.discord()} with the same Torn key.</p>
     </div>`;
   }
 
@@ -6143,7 +6280,7 @@ const ViewToday = (() => {
     }
     const escort = Escort.explain();
     if (Settings.get("escort_on") && !escort.ok) {
-      out.push(`<div class="o-note is-warn">${Fmt.esc(escort.text)}</div>`);
+      out.push(`<div class="o-note is-warn">${Fmt.linkDiscord(Fmt.esc(escort.text))}</div>`);
     }
     return out.join("");
   }
@@ -6452,7 +6589,7 @@ const ViewShops = (() => {
   }
 
   function margin(item) {
-    return Data.margin(item.market_value, item.sell_price, item.cost, null, item.name);
+    return Data.margin(item.market_value, item.sell_price, item.cost, Settings.get("sell_to"), item.name);
   }
 
   function render(el) {
@@ -7107,7 +7244,7 @@ const ViewWatches = (() => {
   function ordered(list) {
     const travel = Settings.get("travel_type");
     const rate = (w) => Data.profitPerMinute(
-      Data.margin(w.market_value, w.sell_price, w.cost, null, w.name), w.country, travel, 1);
+      Data.margin(w.market_value, w.sell_price, w.cost, Settings.get("sell_to"), w.name), w.country, travel, 1);
     return list.map((w) => ({ w, r: rate(w) }))
       .sort((a, b) => (a.r === null) - (b.r === null) || (b.r || 0) - (a.r || 0)
         || (a.w.name || "").localeCompare(b.w.name || ""))
@@ -7130,7 +7267,7 @@ const ViewWatches = (() => {
         : null;
       const departAt = f && f.depart_at ? Date.parse(f.depart_at) : fallbackDepart;
       const cap = Settings.get("capacity");
-      const ppm = Data.profitPerMinute(Data.margin(w.market_value, w.sell_price, w.cost, null, w.name),
+      const ppm = Data.profitPerMinute(Data.margin(w.market_value, w.sell_price, w.cost, Settings.get("sell_to"), w.name),
         w.country, Settings.get("travel_type"), cap);
       const boardTitle = departAt && cap && w.cost ? ` title="Take ${Fmt.esc(Fmt.money(cap * w.cost))}"` : "";
       const board = departAt ? Fmt.board(departAt) : '<span class="muted">—</span>';
@@ -7447,7 +7584,7 @@ const ViewItems = (() => {
     const capacity = Settings.get("capacity");
 
     const scored = list.map((s) => {
-      const perItem = Data.margin(value.market_price, value.sell_price, s.cost, null, (r.entry.item || {}).name || r.entry.name);
+      const perItem = Data.margin(value.market_price, value.sell_price, s.cost, Settings.get("sell_to"), (r.entry.item || {}).name || r.entry.name);
       return { s, ppm: Data.profitPerMinute(perItem, s.country, travel, capacity) };
     });
 
@@ -7851,7 +7988,7 @@ const ViewSettings = (() => {
       out.push(`<div class="o-row is-stack">
         <span class="o-row-text">
           <span class="o-row-label">${dot()} Torn Oracle token</span>
-          <span class="o-row-help">From <b>/token new</b> on Discord.</span>
+          <span class="o-row-help">From <b>/token new</b> on ${Fmt.discord()}.</span>
         </span>
         <span class="o-keyform">
           <input type="password" data-secret="oracle_token" placeholder="Paste your token"
@@ -7875,7 +8012,7 @@ const ViewSettings = (() => {
       out.push(acct.discordLinked
         ? row(dot("go") + " Discord", "Linked. Alerts and your plan can reach you there.", "")
         : row(dot("warn") + " Discord",
-          "Not linked. Run <b>/register</b> on Discord with your Torn key.", ""));
+          "Not linked. Run <b>/register</b> on " + Fmt.discord() + " with your Torn key.", ""));
     }
 
     if (haveToken) {
@@ -7931,7 +8068,8 @@ const ViewSettings = (() => {
   function escortLine() {
     if (!Settings.get("escort_on")) return "";
     const e = Escort.explain();
-    return `<div class="o-note${e.ok ? "" : " is-warn"}" style="margin:0 0 10px">${Fmt.esc(e.text)}</div>`;
+    const text = e.ok ? Fmt.esc(e.text) : Fmt.linkDiscord(Fmt.esc(e.text));
+    return `<div class="o-note${e.ok ? "" : " is-warn"}" style="margin:0 0 10px">${text}</div>`;
   }
 
   function diagnostics() {
@@ -8683,7 +8821,7 @@ const Assist = (() => {
     if (planLeg && planLeg.item_id && Settings.get("assist_kit").hosp && planLeg.country === bestCode()) {
       return [{ id: planLeg.item_id, name: planLeg.item_name }];
     }
-    if (bestShown()) return best().refs;
+    if (bestShown()) return best().refs.slice(0, Settings.get("assist_best_n"));
     const picked = Settings.get("assist_track");
     const leg = Trip.get().active ? Trip.currentLeg() : null;
     if (!leg || !leg.item_id || picked.some((r) => r.id === leg.item_id)) return picked;
@@ -8759,7 +8897,7 @@ const Assist = (() => {
 
   function decide(f) {
     const count = (ref) => (ref && f.carried ? f.carried.filter((n) => n === ref.name).length : 0);
-    const kit = f.kit || { hosp: null, med: null, meds: 0, extras: [] };
+    const kit = f.kit || { hosp: null, hosps: 0, med: null, meds: 0, extras: [] };
 
     const selling = (f.sell || [])
       .map((ref) => ({ ref, n: count(ref) }))
@@ -8768,7 +8906,7 @@ const Assist = (() => {
 
     if (f.mode === "agency") {
       const need = [];
-      if (kit.hosp) need.push({ ref: kit.hosp, n: 1 });
+      if (kit.hosp && kit.hosps > 0) need.push({ ref: kit.hosp, n: kit.hosps });
       if (kit.med && kit.meds > 0) need.push({ ref: kit.med, n: kit.meds });
       for (const e of kit.extras || []) need.push({ ref: { id: e.id, name: e.name }, n: e.n });
       const fill = f.fill;
@@ -8842,7 +8980,7 @@ const Assist = (() => {
           const note = amount === free ? ""
             : afford < x.row.stock ? "Your cash covers " + amount + "."
                                    : "Only " + amount + " in stock.";
-          return { act: "buy", ref: x.ref, amount, ready, skip: "buy", note,
+          return { act: "buy", ref: x.ref, amount, price: x.row.price, ready, skip: "buy", note,
                    label: "Buy " + amount + " " + x.ref.name };
         }
       }
@@ -8915,6 +9053,12 @@ const Assist = (() => {
 
     if (step.act === "sell" && (res.ok || (res.refused && !inHospital()))) {
       markVisit({ sell: (visit().sell || []).filter((r) => r.id !== step.ref.id) });
+    }
+    if (res.ok && (step.act === "buy" || step.act === "sell")) {
+      if (step.act === "buy") Trip.pageBuy(step.ref, step.amount, step.price);
+      else Trip.walletMoved();
+      PlanSync.changed();
+      Panel.refresh("today");
     }
     if (res.ok) {
       if (step.act === "buy") markVisit({ bought: true });
@@ -9233,6 +9377,9 @@ const ViewAssist = (() => {
       <div class="o-group"><h4>Trip kit</h4>
         <div class="o-field"><span class="o-field-label">Self-hosp item</span>
           ${itemInput("hosp", kit.hosp, "oracle-all-items")}</div>
+        <div class="o-field"><span class="o-field-label">Self-hosp items to pack</span>
+          <input type="number" data-kit="hosps" min="0" max="${Settings.MAX_MEDS}" step="1"
+                 value="${kit.hosps}"></div>
         <div class="o-field"><span class="o-field-label">Med-out item</span>
           ${itemInput("med", kit.med, "oracle-all-items")}</div>
         <div class="o-field"><span class="o-field-label">Med-out items to pack</span>
@@ -9276,6 +9423,9 @@ const ViewAssist = (() => {
           <button type="button" class="o-btn" data-act="track">Add</button></div>` : ""}
         <p class="o-note">${toggle("assist_auto_track", "Track the best items")}
           ${Assist.bestOn() && !best ? "<br>The list is set when you pick a destination." : ""}</p>
+        ${Assist.bestOn() ? `<div class="o-field"><span class="o-field-label">Best items to track</span>
+          <input type="number" data-best-n min="1" max="${Settings.MAX_TRACKED}" step="1"
+                 value="${Settings.get("assist_best_n")}"></div>` : ""}
       </div>
       ${catalogue ? options("oracle-all-items", false) + options("oracle-abroad-items", true) : ""}`;
     wire(el);
@@ -9335,8 +9485,27 @@ const ViewAssist = (() => {
         setKit({ [slot]: { id: hit.id, name: hit.name } });
       });
     }
-    const meds = el.querySelector('input[data-kit="meds"]');
-    if (meds) meds.addEventListener("change", () => setKit({ meds: Number(meds.value) || 0 }));
+    const bestN = el.querySelector("[data-best-n]");
+    if (bestN) {
+      bestN.addEventListener("change", () => {
+        const n = Math.round(Number(bestN.value));
+        if (!(n >= 1 && n <= Settings.MAX_TRACKED)) {
+          tell("Track between 1 and " + Settings.MAX_TRACKED + ".", "warn");
+          return;
+        }
+        Settings.set("assist_best_n", n);
+        Assist.paint();
+        Panel.refresh("assist", true);
+      });
+    }
+    for (const slot of ["hosps", "meds"]) {
+      const input = el.querySelector(`input[data-kit="${slot}"]`);
+      if (!input) continue;
+      input.addEventListener("change", () => {
+        const n = Math.round(Number(input.value));
+        setKit({ [slot]: n >= 0 ? Math.min(n, Settings.MAX_MEDS) : 0 });
+      });
+    }
     const track = el.querySelector("[data-track]");
     if (track) {
       track.addEventListener("keydown", (ev) => { if (ev.key === "Enter") addTracked(el); });
@@ -9600,7 +9769,7 @@ const ExportWatch = (() => {
   // Taille de valise réglée dans Oracle, moins le trip kit (self-hosp et objets de med-out)
   function units() {
     const kit = Settings.get("assist_kit") || {};
-    const packed = (kit.hosp ? 1 : 0) + (kit.med ? kit.meds || 0 : 0);
+    const packed = (kit.hosp ? kit.hosps ?? 1 : 0) + (kit.med ? kit.meds || 0 : 0);
     return Math.max(0, (Settings.get("capacity") || 0) - packed);
   }
 
@@ -10085,14 +10254,6 @@ Env.ready().then(function boot() {
 
   Settings.load();
   ExportWatch.start();
-  {
-    const live = Env.read("fork_presets", null), kept = Env.durable("fork_presets");
-    const old = (kept && kept.at > ((live && live.at) || 0)) ? kept : live;
-    if (old && old.presets && Object.keys(old.presets).length && !Object.keys(Settings.presets()).length) {
-      Env.write("presets", old.presets);
-      Env.keep("presets", old.presets);
-    }
-  }
   if (!/sid=travel/.test(location.href)) return;
   BazaarOpen.start();
   Trip.load();

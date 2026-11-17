@@ -2,12 +2,12 @@
 
 *[Version française](#version-francaise)*
 
-Fork of **Torn Oracle: Travel** (author: Ruinbringer, license GPL-3.0-only, [Greasy Fork](https://greasyfork.org/en/scripts/590310-torn-oracle-travel)): wherever Torn Oracle shows a profit (plans, plan purchases, Shops, Watches, Museum), each item is sold through its best channel.
+Fork of **Torn Oracle: Travel** (author: Ruinbringer, license GPL-3.0-only, [Greasy Fork](https://greasyfork.org/en/scripts/590310-torn-oracle-travel)): wherever Torn Oracle shows a profit (plans, plan purchases, Shops, Watches, Museum), selling to players means selling on your bazaar, at a rate that depends on the item's category instead of Torn Oracle's single "Sell under market" discount.
 
 - your bazaar: 1 $ under the cheapest bazaar, never under the Wardogs traders rate for the item's category + 2 points of market value (floor; e.g. 98 % rate, 100 % floor; cars, which traders refuse: 92 %). Your bazaar therefore always beats the traders. Only the floor is counted, so the margin shown is the minimum you get
 - city: the shop's buyback price
 
-The Shops tab has a **Sell** column showing that channel (Bazaar or the name of the shop that buys it back). The "Sell to" and "Sell under market" settings no longer have any effect.
+Torn Oracle's **Sell to** setting still applies: keep it on **Best price** (the default since 2.6.10) to count each item at whichever of the two pays more. The "Sell under market by" setting is hidden, since the category rate replaces it. The Shops tab has a **Sell** column showing the channel used (Bazaar or the name of the shop that buys it back).
 
 ## Export alert
 
@@ -29,7 +29,7 @@ Torn Oracle's own **Track the best items** box (Assist tab) ranks items with the
 
 ## Presets
 
-Torn Oracle has its own presets since 2.6.9 (**Settings** tab, **Presets** section). The fork's former presets are copied into them once, on the first start, if you have no native preset yet.
+Torn Oracle has its own presets since 2.6.9 (**Settings** tab, **Presets** section).
 
 The fork marks the preset in use (● and its name in the accent color, the last one loaded or saved) and says when your settings changed since. Load and Update are greyed out on any preset identical to your current settings, since they would change nothing. While a preset is in use, Update is also greyed out on the other presets, so they can't be overwritten with its settings by mistake.
 
@@ -49,12 +49,12 @@ GPL-3.0-only, like the original (`LICENSE`).
 
 ## Version française
 
-Fork de **Torn Oracle: Travel** (auteur : Ruinbringer, licence GPL-3.0-only, [Greasy Fork](https://greasyfork.org/en/scripts/590310-torn-oracle-travel)) : partout où Torn Oracle affiche un profit (plans, achats du plan, Shops, Watches, Museum), la vente se fait au meilleur canal de chaque objet.
+Fork de **Torn Oracle: Travel** (auteur : Ruinbringer, licence GPL-3.0-only, [Greasy Fork](https://greasyfork.org/en/scripts/590310-torn-oracle-travel)) : partout où Torn Oracle affiche un profit (plans, achats du plan, Shops, Watches, Museum), la vente aux joueurs se fait sur ton bazaar, à un taux qui dépend de la catégorie de l'objet, au lieu de la décote unique « Sell under market » de Torn Oracle.
 
 - ton bazaar : 1 $ sous le bazaar le moins cher, jamais sous le taux des traders Wardogs de la catégorie + 2 points du market value (plancher ; ex. taux 98 %, plancher 100 % ; voitures, refusées par les traders : 92 %). Ton bazaar bat donc toujours les traders. Seul le plancher est compté : la marge affichée est un minimum
 - ville : prix de rachat de la boutique
 
-L'onglet Shops a une colonne **Sell** qui indique ce canal (Bazaar ou le nom de la boutique qui rachète). Les réglages « Sell to » et « Sell under market » n'ont plus d'effet.
+Le réglage **Sell to** de Torn Oracle s'applique toujours : le laisser sur **Best price** (valeur par défaut depuis la 2.6.10) pour compter chaque objet au plus payant des deux. Le réglage « Sell under market by » est masqué, remplacé par le taux de la catégorie. L'onglet Shops a une colonne **Sell** qui indique le canal retenu (Bazaar ou le nom de la boutique qui rachète).
 
 ### Alerte d'export
 
@@ -76,7 +76,7 @@ La case native **Track the best items** (onglet Assist) classe les objets avec l
 
 ### Presets
 
-Torn Oracle a ses propres presets depuis la 2.6.9 (onglet **Settings**, section **Presets**). Les anciens presets du fork y sont recopiés une fois, au premier lancement, s'il n'y a encore aucun preset natif.
+Torn Oracle a ses propres presets depuis la 2.6.9 (onglet **Settings**, section **Presets**).
 
 Le fork signale le preset en place (● et nom en couleur, le dernier chargé ou enregistré) et indique si tes réglages ont changé depuis. Load et Update sont grisés sur tout preset identique à tes réglages actuels, puisqu'ils ne changeraient rien. Tant qu'un preset est en place, Update est aussi grisé sur les autres presets, pour ne pas les écraser par erreur avec ses réglages.
 

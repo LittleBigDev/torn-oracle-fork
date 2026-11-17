@@ -20,7 +20,7 @@ const ExportWatch = (() => {
   // Taille de valise réglée dans Oracle, moins le trip kit (self-hosp et objets de med-out)
   function units() {
     const kit = Settings.get("assist_kit") || {};
-    const packed = (kit.hosp ? 1 : 0) + (kit.med ? kit.meds || 0 : 0);
+    const packed = (kit.hosp ? kit.hosps ?? 1 : 0) + (kit.med ? kit.meds || 0 : 0);
     return Math.max(0, (Settings.get("capacity") || 0) - packed);
   }
 
