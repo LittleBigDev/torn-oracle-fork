@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.12-fork
+// @version      2.6.13-fork
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.12 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (bazaar, ville), alerte d'export sur toutes les pages.
+// @description  Fork de Torn Oracle: Travel 2.6.13 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (bazaar, ville), alerte d'export sur toutes les pages.
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -33,13 +33,10 @@ const Env = (() => {
     || /TornPDA/i.test(navigator.userAgent || "");
 
   const hasGmXhr = typeof GM_xmlhttpRequest === "function";
-
   const hasPdaHttp = typeof PDA_httpGet === "function";
 
   const caps = {
-
     notify: typeof GM_notification === "function" && !isPDA,
-
     xhr: hasGmXhr || hasPdaHttp,
     storage: typeof GM_getValue === "function" && typeof GM_setValue === "function",
     style: typeof GM_addStyle === "function",
@@ -137,7 +134,7 @@ const Env = (() => {
       if (typeof GM_deleteValue === "function") GM_deleteValue(PREFIX + key);
       else if (!caps.storage) window.localStorage.removeItem(PREFIX + key);
       else GM_setValue(PREFIX + key, "");
-    } catch (e) {  }
+    } catch {}
   }
 
   const LOG_MAX = 300;
@@ -148,7 +145,6 @@ const Env = (() => {
     entries.push(row);
     if (entries.length > LOG_MAX) entries.splice(0, entries.length - LOG_MAX);
     if (level === "error" || level === "warn") {
-
       console[level === "error" ? "error" : "warn"]("[Torn Oracle]", message, detail || "");
     }
     return row;
@@ -158,14 +154,13 @@ const Env = (() => {
     if (detail === undefined || detail === null) return null;
     if (typeof detail === "string") return detail;
     if (detail instanceof Error) return detail.message;
-    try { return JSON.stringify(detail); } catch (e) { return String(detail); }
+    try { return JSON.stringify(detail); } catch { return String(detail); }
   }
 
   const log = {
     info: (m, d) => record("info", m, d),
     warn: (m, d) => record("warn", m, d),
     error: (m, d) => record("error", m, d),
-
     event: (m, d) => record("event", m, d),
     entries: () => entries.slice(),
     clear: () => entries.splice(0, entries.length),
@@ -180,7 +175,6 @@ const Env = (() => {
       lastTickAt = Date.now();
       return prev === 0 ? 0 : lastTickAt - prev;
     },
-
     sleptThrough(gapMs, expectedMs) {
       return gapMs > Math.max(3 * expectedMs, 90_000);
     },
@@ -206,7 +200,7 @@ const Env = (() => {
 
   function visible() {
     try { return document.visibilityState !== "hidden"; }
-    catch (e) { return true; }
+    catch { return true; }
   }
 
   return {
@@ -279,8 +273,8 @@ const Data = (() => {
   }
 
   // Fork : taux du bazaar par objet (généré par maj.py) : taux traders Wardogs de la catégorie + 2 points (Car : 92 %)
-  const TAUX_BAZAAR = {"9mm Uzi": 0.82, "AK-47": 0.82, "African Violet": 1.0, "Afro Comb": 0.27, "Aluminum Plate": 0.92, "Ambergris Lump": 0.27, "ArmaLite M-15A4": 0.82, "Axe": 0.82, "BT MP9": 0.82, "Banana Orchid": 1.0, "Basalt Point": 0.92, "Bear Gall": 0.27, "Bearer Bond": 0.27, "Bikini": 0.27, "Blank Casino Chips": 0.92, "Blowgun": 0.82, "Bo Staff": 0.82, "Bolt Cutters": 0.92, "Bonded Latex": 0.92, "Bottle of Sake": 0.97, "Bottle of Tequila": 0.97, "Bushmaster Carbon 15": 0.82, "Camel Plushie": 1.0, "Cannabis": 0.97, "Card Skimmer": 0.92, "Ceibo Flower": 1.0, "Chain Whip": 0.82, "Chalcedony Point": 0.92, "Chamois Plushie": 1.0, "Cherry Blossom": 1.0, "Chert Point": 0.92, "Chopsticks": 0.27, "Claymore Mine": 0.97, "Claymore Sword": 0.82, "Cobra Derringer": 0.82, "Coconut Bra": 0.27, "Combat Boots": 0.82, "Combat Gloves": 0.82, "Combat Helmet": 0.82, "Combat Pants": 0.82, "Combat Vest": 0.82, "Compass": 0.27, "Construction Helmet": 0.82, "Counterfeit Manga": 0.27, "Crazy Straw": 0.27, "Cricket Bat": 0.82, "Crocus": 1.0, "Crossbow": 0.82, "Dahlia": 1.0, "Dart Board": 0.27, "Desert Eagle": 0.82, "Diamond Bladed Knife": 0.82, "Diving Gloves": 0.27, "Dog Treats": 0.92, "Dozen White Roses": 1.0, "Ecstasy": 0.97, "Edelweiss": 1.0, "Elephant Statue": 0.27, "Enfield SA-80": 0.82, "Ephedrine Powder": 0.27, "Ergotamine Ampoule": 0.27, "Fire Hydrant": 0.27, "Fireworks": 0.97, "Flail": 0.82, "Flak Jacket": 0.82, "Flamethrower": 0.82, "Flare Gun": 0.82, "Flash Grenade": 0.97, "Flexible Body Armor": 0.82, "Flippers": 0.27, "Frying Pan": 0.82, "Glow Stick": 0.92, "Gold Laptop": 0.92, "Gold Plated AK-47": 0.82, "Grenade": 0.97, "Guandao": 0.82, "HEG": 0.97, "Handbag": 0.82, "Harpoon": 0.82, "Heather": 1.0, "Heckler & Koch SL8": 0.82, "Hockey Stick": 0.27, "Hydrochloric Acid": 0.92, "Ice Pick": 0.82, "Inkwell": 0.92, "Insulin": 0.27, "Ithaca 37": 0.82, "Jackhammer": 0.82, "Jade Buddha": 0.27, "Jaguar Plushie": 1.0, "Kabuki Mask": 0.27, "Kama": 0.82, "Katana": 0.82, "Ketamine": 0.97, "Kevlar Gloves": 0.82, "Knuckle Dusters": 0.82, "Kodachi": 0.82, "LSD": 0.97, "Large Suitcase": 0.92, "Leather Bullwhip": 0.82, "Lighter": 0.92, "Lion Plushie": 1.0, "Liquid Body Armor": 0.82, "Lorcin 380": 0.82, "M249 SAW": 0.82, "Macana": 0.82, "Mag 7": 0.82, "Magnesium Shavings": 0.92, "Maneki Neko": 0.27, "Mayan Statue": 0.27, "Medium Suitcase": 0.92, "Metal Nunchaku": 0.82, "Meteorite Fragment": 0.92, "Minigun": 0.82, "Model Space Ship": 0.27, "Monkey Plushie": 1.0, "Mountie Hat": 0.27, "Natural Pearls": 0.27, "Naval Cutlass": 0.82, "Nessie Plushie": 1.0, "Neumune Tablet": 0.92, "Ninja Claws": 0.82, "Ninja Star": 0.97, "Nodding Turtle": 0.27, "Obsidian Point": 0.92, "Opium": 0.97, "Orchid": 1.0, "Outer Tactical Vest": 0.82, "PCP": 0.97, "PVC Cards": 0.92, "Panda Plushie": 1.0, "Pangolin Scales": 0.27, "Paper Weight": 0.27, "Patagonian Fossil": 0.92, "Pele Charm": 0.27, "Peony": 1.0, "Pink Mac-10": 0.82, "Potassium Nitrate": 0.92, "Printing Paper": 0.92, "Proda Sunglasses": 0.27, "Qsz-92": 0.82, "Quartz Point": 0.92, "Quartzite Point": 0.92, "Raw Ivory": 0.27, "Red Fox Plushie": 1.0, "SIG 552": 0.82, "SKS Carbine": 0.82, "Safety Boots": 0.82, "Safrole Oil": 0.27, "Sai": 0.82, "Samurai Sword": 0.82, "Sensu": 0.27, "Sextant": 0.27, "Shark Fin": 0.27, "Ship in a Bottle": 0.27, "Shrooms": 0.97, "Small Suitcase": 0.92, "Smoke Grenade": 0.97, "Snorkel": 0.27, "Snowboard": 0.27, "Soccer Ball": 0.27, "Spear": 0.82, "Speed": 0.97, "Speedo": 0.27, "Sports Shades": 0.27, "Sports Sneakers": 0.92, "Springfield 1911": 0.82, "Steel Drum": 0.27, "Stick Grenade": 0.97, "Stick of Dynamite": 0.92, "Stingray Plushie": 1.0, "Sumo Doll": 0.27, "Swiss Army Knife": 0.82, "Tailor's Dummy": 0.27, "Taser": 0.82, "Taurus PT92": 0.82, "Tavor TAR-21": 0.82, "Tear Gas": 0.97, "Throwing Knife": 0.97, "Tiger Bone Powder": 0.27, "Trench Coat": 0.27, "Tribulus Omanense": 1.0, "Trout": 0.97, "Turtle Shell": 0.27, "Twin Tiger Hooks": 0.82, "Type 98 Anti Tank": 0.82, "Uncut Diamonds": 0.27, "Vektor CR-21": 0.82, "Vicodin": 0.97, "WWII Helmet": 0.82, "Wetsuit": 0.27, "Whale Meat": 0.27, "Wolverine Plushie": 1.0, "Wooden Nunchaku": 0.82, "Wushu Double Axes": 0.82, "Xanax": 0.97, "Yakitori Lantern": 0.27, "Yucca Plant": 0.27, "Zip Ties": 0.92};
-  const BOUTIQUES = {"9mm Uzi": "Big Al's Gun Shop", "AK-47": "Big Al's Gun Shop", "African Violet": "Bits 'n' Bobs", "Afro Comb": "Recycling Center", "Ambergris Lump": "Jewelry Store", "ArmaLite M-15A4": "Big Al's Gun Shop", "Axe": "Big Al's Gun Shop", "BT MP9": "Big Al's Gun Shop", "Banana Orchid": "Bits 'n' Bobs", "Bear Gall": "Nikeh Sports", "Bearer Bond": "Pawn Shop", "Bikini": "TC Clothing", "Blowgun": "Big Al's Gun Shop", "Bo Staff": "Big Al's Gun Shop", "Bottle of Sake": "Bits 'n' Bobs", "Bottle of Tequila": "Bits 'n' Bobs", "Bushmaster Carbon 15": "Big Al's Gun Shop", "Camel Plushie": "Bits 'n' Bobs", "Ceibo Flower": "Bits 'n' Bobs", "Chain Whip": "Big Al's Gun Shop", "Chamois Plushie": "Bits 'n' Bobs", "Cherry Blossom": "Bits 'n' Bobs", "Chopsticks": "Bits 'n' Bobs", "Claymore Mine": "Big Al's Gun Shop", "Claymore Sword": "Big Al's Gun Shop", "Cobra Derringer": "Big Al's Gun Shop", "Coconut Bra": "TC Clothing", "Combat Boots": "Big Al's Gun Shop", "Combat Gloves": "Big Al's Gun Shop", "Combat Helmet": "Big Al's Gun Shop", "Combat Pants": "Big Al's Gun Shop", "Combat Vest": "Big Al's Gun Shop", "Compass": "Bits 'n' Bobs", "Construction Helmet": "Big Al's Gun Shop", "Counterfeit Manga": "Pawn Shop", "Crazy Straw": "Recycling Center", "Cricket Bat": "Big Al's Gun Shop", "Crocus": "Bits 'n' Bobs", "Crossbow": "Big Al's Gun Shop", "Dahlia": "Bits 'n' Bobs", "Dart Board": "Recycling Center", "Desert Eagle": "Big Al's Gun Shop", "Diamond Bladed Knife": "Big Al's Gun Shop", "Diving Gloves": "TC Clothing", "Edelweiss": "Bits 'n' Bobs", "Elephant Statue": "Bits 'n' Bobs", "Enfield SA-80": "Big Al's Gun Shop", "Ephedrine Powder": "Pharmacy", "Ergotamine Ampoule": "Pharmacy", "Fire Hydrant": "Recycling Center", "Fireworks": "Big Al's Gun Shop", "Flail": "Big Al's Gun Shop", "Flak Jacket": "Big Al's Gun Shop", "Flamethrower": "Big Al's Gun Shop", "Flare Gun": "Big Al's Gun Shop", "Flash Grenade": "Big Al's Gun Shop", "Flexible Body Armor": "Big Al's Gun Shop", "Flippers": "TC Clothing", "Frying Pan": "Big Al's Gun Shop", "Grenade": "Big Al's Gun Shop", "Guandao": "Big Al's Gun Shop", "HEG": "Big Al's Gun Shop", "Harpoon": "Big Al's Gun Shop", "Heather": "Bits 'n' Bobs", "Heckler & Koch SL8": "Big Al's Gun Shop", "Hockey Stick": "Bits 'n' Bobs", "Hydrochloric Acid": "Pharmacy", "Ice Pick": "Big Al's Gun Shop", "Insulin": "Pharmacy", "Ithaca 37": "Big Al's Gun Shop", "Jackhammer": "Big Al's Gun Shop", "Jade Buddha": "Recycling Center", "Jaguar Plushie": "Bits 'n' Bobs", "Kabuki Mask": "TC Clothing", "Kama": "Big Al's Gun Shop", "Katana": "Big Al's Gun Shop", "Kevlar Gloves": "Big Al's Gun Shop", "Knuckle Dusters": "Big Al's Gun Shop", "Kodachi": "Big Al's Gun Shop", "Large Suitcase": "Bits 'n' Bobs", "Leather Bullwhip": "Big Al's Gun Shop", "Lion Plushie": "Bits 'n' Bobs", "Liquid Body Armor": "Big Al's Gun Shop", "Lorcin 380": "Big Al's Gun Shop", "M249 SAW": "Big Al's Gun Shop", "Macana": "Big Al's Gun Shop", "Mag 7": "Big Al's Gun Shop", "Maneki Neko": "Recycling Center", "Mayan Statue": "Bits 'n' Bobs", "Medium Suitcase": "Bits 'n' Bobs", "Metal Nunchaku": "Big Al's Gun Shop", "Minigun": "Big Al's Gun Shop", "Model Space Ship": "Recycling Center", "Monkey Plushie": "Bits 'n' Bobs", "Mountie Hat": "TC Clothing", "Natural Pearls": "Jewelry Store", "Naval Cutlass": "Big Al's Gun Shop", "Nessie Plushie": "Bits 'n' Bobs", "Neumune Tablet": "Pharmacy", "Ninja Claws": "Big Al's Gun Shop", "Ninja Star": "Big Al's Gun Shop", "Nodding Turtle": "Recycling Center", "Orchid": "Bits 'n' Bobs", "Outer Tactical Vest": "Big Al's Gun Shop", "Panda Plushie": "Bits 'n' Bobs", "Pangolin Scales": "Nikeh Sports", "Paper Weight": "Bits 'n' Bobs", "Pele Charm": "Bits 'n' Bobs", "Peony": "Bits 'n' Bobs", "Proda Sunglasses": "TC Clothing", "Qsz-92": "Big Al's Gun Shop", "Raw Ivory": "Pawn Shop", "Red Fox Plushie": "Bits 'n' Bobs", "SIG 552": "Big Al's Gun Shop", "SKS Carbine": "Big Al's Gun Shop", "Safety Boots": "Big Al's Gun Shop", "Safrole Oil": "Pharmacy", "Sai": "Big Al's Gun Shop", "Samurai Sword": "Big Al's Gun Shop", "Sensu": "Bits 'n' Bobs", "Sextant": "Recycling Center", "Shark Fin": "Nikeh Sports", "Ship in a Bottle": "Recycling Center", "Small Suitcase": "Bits 'n' Bobs", "Smoke Grenade": "Big Al's Gun Shop", "Snorkel": "TC Clothing", "Snowboard": "Recycling Center", "Soccer Ball": "Bits 'n' Bobs", "Spear": "Big Al's Gun Shop", "Speedo": "TC Clothing", "Sports Shades": "TC Clothing", "Springfield 1911": "Big Al's Gun Shop", "Steel Drum": "Recycling Center", "Stick Grenade": "Big Al's Gun Shop", "Stingray Plushie": "Bits 'n' Bobs", "Sumo Doll": "Bits 'n' Bobs", "Swiss Army Knife": "Big Al's Gun Shop", "Tailor's Dummy": "Recycling Center", "Taser": "Big Al's Gun Shop", "Taurus PT92": "Big Al's Gun Shop", "Tavor TAR-21": "Big Al's Gun Shop", "Tear Gas": "Big Al's Gun Shop", "Throwing Knife": "Big Al's Gun Shop", "Tiger Bone Powder": "Nikeh Sports", "Trench Coat": "TC Clothing", "Tribulus Omanense": "Bits 'n' Bobs", "Trout": "Big Al's Gun Shop", "Turtle Shell": "Jewelry Store", "Twin Tiger Hooks": "Big Al's Gun Shop", "Type 98 Anti Tank": "Big Al's Gun Shop", "Uncut Diamonds": "Jewelry Store", "Vektor CR-21": "Big Al's Gun Shop", "WWII Helmet": "Big Al's Gun Shop", "Wetsuit": "TC Clothing", "Whale Meat": "Nikeh Sports", "Wolverine Plushie": "Bits 'n' Bobs", "Wooden Nunchaku": "Big Al's Gun Shop", "Wushu Double Axes": "Big Al's Gun Shop", "Yakitori Lantern": "Recycling Center", "Yucca Plant": "Recycling Center"};
+  const TAUX_BAZAAR = {"9mm Uzi": 0.82, "AK-47": 0.82, "African Violet": 1.0, "Afro Comb": 0.27, "Aluminum Plate": 0.92, "Ambergris Lump": 0.27, "ArmaLite M-15A4": 0.82, "Axe": 0.82, "BT MP9": 0.82, "Banana Orchid": 1.0, "Basalt Point": 0.92, "Bear Gall": 0.27, "Bearer Bond": 0.27, "Bikini": 0.27, "Blowgun": 0.82, "Bo Staff": 0.82, "Bolt Cutters": 0.92, "Bonded Latex": 0.92, "Bottle of Sake": 0.97, "Bottle of Tequila": 0.97, "Bushmaster Carbon 15": 0.82, "Camel Plushie": 1.0, "Cannabis": 0.97, "Card Skimmer": 0.92, "Ceibo Flower": 1.0, "Chain Whip": 0.82, "Chalcedony Point": 0.92, "Chamois Plushie": 1.0, "Cherry Blossom": 1.0, "Chert Point": 0.92, "Chopsticks": 0.27, "Claymore Mine": 0.97, "Claymore Sword": 0.82, "Cobra Derringer": 0.82, "Coconut Bra": 0.27, "Combat Boots": 0.82, "Combat Gloves": 0.82, "Combat Helmet": 0.82, "Combat Pants": 0.82, "Combat Vest": 0.82, "Compass": 0.27, "Counterfeit Manga": 0.27, "Crazy Straw": 0.27, "Cricket Bat": 0.82, "Crocus": 1.0, "Crossbow": 0.82, "Dahlia": 1.0, "Dart Board": 0.27, "Desert Eagle": 0.82, "Diamond Bladed Knife": 0.82, "Diving Gloves": 0.27, "Dog Treats": 0.92, "Dozen White Roses": 1.0, "Ecstasy": 0.97, "Edelweiss": 1.0, "Elephant Statue": 0.27, "Enfield SA-80": 0.82, "Ephedrine Powder": 0.27, "Ergotamine Ampoule": 0.27, "Fire Hydrant": 0.27, "Fireworks": 0.97, "Flail": 0.82, "Flak Jacket": 0.82, "Flamethrower": 0.82, "Flare Gun": 0.82, "Flash Grenade": 0.97, "Flexible Body Armor": 0.82, "Flippers": 0.27, "Frying Pan": 0.82, "Glow Stick": 0.92, "Gold Laptop": 0.92, "Gold Plated AK-47": 0.82, "Grenade": 0.97, "Guandao": 0.82, "HEG": 0.97, "Handbag": 0.82, "Harpoon": 0.82, "Heather": 1.0, "Heckler & Koch SL8": 0.82, "Hockey Stick": 0.27, "Hydrochloric Acid": 0.92, "Ice Pick": 0.82, "Inkwell": 0.92, "Insulin": 0.27, "Ithaca 37": 0.82, "Jackhammer": 0.82, "Jade Buddha": 0.27, "Jaguar Plushie": 1.0, "Kabuki Mask": 0.27, "Kama": 0.82, "Katana": 0.82, "Ketamine": 0.97, "Kevlar Gloves": 0.82, "Knuckle Dusters": 0.82, "Kodachi": 0.82, "LSD": 0.97, "Large Suitcase": 0.92, "Leather Bullwhip": 0.82, "Lighter": 0.92, "Lion Plushie": 1.0, "Liquid Body Armor": 0.82, "Lorcin 380": 0.82, "M249 SAW": 0.82, "Macana": 0.82, "Mag 7": 0.82, "Magnesium Shavings": 0.92, "Maneki Neko": 0.27, "Mayan Statue": 0.27, "Medium Suitcase": 0.92, "Metal Nunchaku": 0.82, "Meteorite Fragment": 0.92, "Minigun": 0.82, "Model Space Ship": 0.27, "Monkey Plushie": 1.0, "Mountie Hat": 0.27, "Natural Pearls": 0.27, "Naval Cutlass": 0.82, "Nessie Plushie": 1.0, "Neumune Tablet": 0.92, "Ninja Claws": 0.82, "Ninja Star": 0.97, "Nodding Turtle": 0.27, "Obsidian Point": 0.92, "Opium": 0.97, "Orchid": 1.0, "Outer Tactical Vest": 0.82, "PCP": 0.97, "PVC Cards": 0.92, "Panda Plushie": 1.0, "Pangolin Scales": 0.27, "Paper Weight": 0.27, "Patagonian Fossil": 0.92, "Pele Charm": 0.27, "Peony": 1.0, "Pink Mac-10": 0.82, "Potassium Nitrate": 0.92, "Printing Paper": 0.92, "Proda Sunglasses": 0.27, "Qsz-92": 0.82, "Quartz Point": 0.92, "Quartzite Point": 0.92, "Raw Ivory": 0.27, "Red Fox Plushie": 1.0, "SIG 552": 0.82, "SKS Carbine": 0.82, "Safety Boots": 0.82, "Safrole Oil": 0.27, "Sai": 0.82, "Samurai Sword": 0.82, "Sensu": 0.27, "Sextant": 0.27, "Shark Fin": 0.27, "Ship in a Bottle": 0.27, "Shrooms": 0.97, "Small Suitcase": 0.92, "Smoke Grenade": 0.97, "Snorkel": 0.27, "Snowboard": 0.27, "Soccer Ball": 0.27, "Spear": 0.82, "Speed": 0.97, "Speedo": 0.27, "Sports Shades": 0.27, "Sports Sneakers": 0.92, "Springfield 1911": 0.82, "Steel Drum": 0.27, "Stick Grenade": 0.97, "Stick of Dynamite": 0.92, "Stingray Plushie": 1.0, "Sumo Doll": 0.27, "Swiss Army Knife": 0.82, "Tailor's Dummy": 0.27, "Taser": 0.82, "Taurus PT92": 0.82, "Tavor TAR-21": 0.82, "Tear Gas": 0.97, "Throwing Knife": 0.97, "Tiger Bone Powder": 0.27, "Trench Coat": 0.27, "Tribulus Omanense": 1.0, "Trout": 0.97, "Turtle Shell": 0.27, "Twin Tiger Hooks": 0.82, "Type 98 Anti Tank": 0.82, "Uncut Diamonds": 0.27, "Vektor CR-21": 0.82, "Vicodin": 0.97, "WWII Helmet": 0.82, "Wetsuit": 0.27, "Whale Meat": 0.27, "Wolverine Plushie": 1.0, "Wooden Nunchaku": 0.82, "Wushu Double Axes": 0.82, "Xanax": 0.97, "Yakitori Lantern": 0.27, "Yucca Plant": 0.27, "Zip Ties": 0.92};
+  const BOUTIQUES = {"9mm Uzi": "Big Al's Gun Shop", "AK-47": "Big Al's Gun Shop", "African Violet": "Bits 'n' Bobs", "Afro Comb": "Recycling Center", "Ambergris Lump": "Jewelry Store", "ArmaLite M-15A4": "Big Al's Gun Shop", "Axe": "Big Al's Gun Shop", "BT MP9": "Big Al's Gun Shop", "Banana Orchid": "Bits 'n' Bobs", "Bear Gall": "Nikeh Sports", "Bearer Bond": "Pawn Shop", "Bikini": "TC Clothing", "Blowgun": "Big Al's Gun Shop", "Bo Staff": "Big Al's Gun Shop", "Bottle of Sake": "Bits 'n' Bobs", "Bottle of Tequila": "Bits 'n' Bobs", "Bushmaster Carbon 15": "Big Al's Gun Shop", "Camel Plushie": "Bits 'n' Bobs", "Ceibo Flower": "Bits 'n' Bobs", "Chain Whip": "Big Al's Gun Shop", "Chamois Plushie": "Bits 'n' Bobs", "Cherry Blossom": "Bits 'n' Bobs", "Chopsticks": "Bits 'n' Bobs", "Claymore Mine": "Big Al's Gun Shop", "Claymore Sword": "Big Al's Gun Shop", "Cobra Derringer": "Big Al's Gun Shop", "Coconut Bra": "TC Clothing", "Combat Boots": "Big Al's Gun Shop", "Combat Gloves": "Big Al's Gun Shop", "Combat Helmet": "Big Al's Gun Shop", "Combat Pants": "Big Al's Gun Shop", "Combat Vest": "Big Al's Gun Shop", "Compass": "Bits 'n' Bobs", "Counterfeit Manga": "Pawn Shop", "Crazy Straw": "Recycling Center", "Cricket Bat": "Big Al's Gun Shop", "Crocus": "Bits 'n' Bobs", "Crossbow": "Big Al's Gun Shop", "Dahlia": "Bits 'n' Bobs", "Dart Board": "Recycling Center", "Desert Eagle": "Big Al's Gun Shop", "Diamond Bladed Knife": "Big Al's Gun Shop", "Diving Gloves": "TC Clothing", "Edelweiss": "Bits 'n' Bobs", "Elephant Statue": "Bits 'n' Bobs", "Enfield SA-80": "Big Al's Gun Shop", "Ephedrine Powder": "Pharmacy", "Ergotamine Ampoule": "Pharmacy", "Fire Hydrant": "Recycling Center", "Fireworks": "Big Al's Gun Shop", "Flail": "Big Al's Gun Shop", "Flak Jacket": "Big Al's Gun Shop", "Flamethrower": "Big Al's Gun Shop", "Flare Gun": "Big Al's Gun Shop", "Flash Grenade": "Big Al's Gun Shop", "Flexible Body Armor": "Big Al's Gun Shop", "Flippers": "TC Clothing", "Frying Pan": "Big Al's Gun Shop", "Grenade": "Big Al's Gun Shop", "Guandao": "Big Al's Gun Shop", "HEG": "Big Al's Gun Shop", "Harpoon": "Big Al's Gun Shop", "Heather": "Bits 'n' Bobs", "Heckler & Koch SL8": "Big Al's Gun Shop", "Hockey Stick": "Bits 'n' Bobs", "Hydrochloric Acid": "Pharmacy", "Ice Pick": "Big Al's Gun Shop", "Insulin": "Pharmacy", "Ithaca 37": "Big Al's Gun Shop", "Jackhammer": "Big Al's Gun Shop", "Jade Buddha": "Recycling Center", "Jaguar Plushie": "Bits 'n' Bobs", "Kabuki Mask": "TC Clothing", "Kama": "Big Al's Gun Shop", "Katana": "Big Al's Gun Shop", "Kevlar Gloves": "Big Al's Gun Shop", "Knuckle Dusters": "Big Al's Gun Shop", "Kodachi": "Big Al's Gun Shop", "Large Suitcase": "Bits 'n' Bobs", "Leather Bullwhip": "Big Al's Gun Shop", "Lion Plushie": "Bits 'n' Bobs", "Liquid Body Armor": "Big Al's Gun Shop", "Lorcin 380": "Big Al's Gun Shop", "M249 SAW": "Big Al's Gun Shop", "Macana": "Big Al's Gun Shop", "Mag 7": "Big Al's Gun Shop", "Maneki Neko": "Recycling Center", "Mayan Statue": "Bits 'n' Bobs", "Medium Suitcase": "Bits 'n' Bobs", "Metal Nunchaku": "Big Al's Gun Shop", "Minigun": "Big Al's Gun Shop", "Model Space Ship": "Recycling Center", "Monkey Plushie": "Bits 'n' Bobs", "Mountie Hat": "TC Clothing", "Natural Pearls": "Jewelry Store", "Naval Cutlass": "Big Al's Gun Shop", "Nessie Plushie": "Bits 'n' Bobs", "Neumune Tablet": "Pharmacy", "Ninja Claws": "Big Al's Gun Shop", "Ninja Star": "Big Al's Gun Shop", "Nodding Turtle": "Recycling Center", "Orchid": "Bits 'n' Bobs", "Outer Tactical Vest": "Big Al's Gun Shop", "Panda Plushie": "Bits 'n' Bobs", "Pangolin Scales": "Nikeh Sports", "Paper Weight": "Bits 'n' Bobs", "Pele Charm": "Bits 'n' Bobs", "Peony": "Bits 'n' Bobs", "Proda Sunglasses": "TC Clothing", "Qsz-92": "Big Al's Gun Shop", "Raw Ivory": "Pawn Shop", "Red Fox Plushie": "Bits 'n' Bobs", "SIG 552": "Big Al's Gun Shop", "SKS Carbine": "Big Al's Gun Shop", "Safety Boots": "Big Al's Gun Shop", "Safrole Oil": "Pharmacy", "Sai": "Big Al's Gun Shop", "Samurai Sword": "Big Al's Gun Shop", "Sensu": "Bits 'n' Bobs", "Sextant": "Recycling Center", "Shark Fin": "Nikeh Sports", "Ship in a Bottle": "Recycling Center", "Small Suitcase": "Bits 'n' Bobs", "Smoke Grenade": "Big Al's Gun Shop", "Snorkel": "TC Clothing", "Snowboard": "Recycling Center", "Soccer Ball": "Bits 'n' Bobs", "Spear": "Big Al's Gun Shop", "Speedo": "TC Clothing", "Sports Shades": "TC Clothing", "Springfield 1911": "Big Al's Gun Shop", "Steel Drum": "Recycling Center", "Stick Grenade": "Big Al's Gun Shop", "Stingray Plushie": "Bits 'n' Bobs", "Sumo Doll": "Bits 'n' Bobs", "Swiss Army Knife": "Big Al's Gun Shop", "Tailor's Dummy": "Recycling Center", "Taser": "Big Al's Gun Shop", "Taurus PT92": "Big Al's Gun Shop", "Tavor TAR-21": "Big Al's Gun Shop", "Tear Gas": "Big Al's Gun Shop", "Throwing Knife": "Big Al's Gun Shop", "Tiger Bone Powder": "Nikeh Sports", "Trench Coat": "TC Clothing", "Tribulus Omanense": "Bits 'n' Bobs", "Trout": "Big Al's Gun Shop", "Turtle Shell": "Jewelry Store", "Twin Tiger Hooks": "Big Al's Gun Shop", "Type 98 Anti Tank": "Big Al's Gun Shop", "Uncut Diamonds": "Jewelry Store", "Vektor CR-21": "Big Al's Gun Shop", "WWII Helmet": "Big Al's Gun Shop", "Wetsuit": "TC Clothing", "Whale Meat": "Nikeh Sports", "Wolverine Plushie": "Bits 'n' Bobs", "Wooden Nunchaku": "Big Al's Gun Shop", "Wushu Double Axes": "Big Al's Gun Shop", "Yakitori Lantern": "Recycling Center", "Yucca Plant": "Recycling Center"};
 
   // Canal retenu par unitSell selon le réglage Sell to : boutique de la ville ou bazaar
   function channel(marketValue, sellPrice, name) {
@@ -344,14 +338,12 @@ const Settings = (() => {
   const VERSION = 2;
 
   const SCHEMA = [
-
     { name: "torn_key", group: "account", kind: "secret", def: "",
       label: "Torn API key",
       help: "Requires a Limited Access Key. Stored locally in your browser." },
     { name: "oracle_token", group: "account", kind: "secret", def: "",
       label: "Torn Oracle token",
       help: "Required for Oracle services. Create one below or run /token new on Discord." },
-
     { name: "oracle_token_id", group: "account", kind: "int", def: 0, hidden: true,
       label: "Token id" },
 
@@ -363,10 +355,8 @@ const Settings = (() => {
       auto: "capacity_from_page",
       label: "Suitcase size",
       help: "Items you carry per flight." },
-
     { name: "capacity_from_page", group: "trips", kind: "bool", def: true, hidden: true,
       label: "Automatic" },
-
     { name: "extra_slots", group: "trips", kind: "int", def: 0, min: 0, max: 50,
       auto: "extra_slots_from_page",
       label: "Company extra slots",
@@ -404,7 +394,6 @@ const Settings = (() => {
       sync: "item_types",
       label: "Item categories",
       help: "None selected means every category." },
-
     { name: "plan_items", group: "buying", kind: "picks", def: {},
       label: "Items",
       help: "Pick items in a category to plan only those. A category with none picked plans all its items." },
@@ -461,7 +450,6 @@ const Settings = (() => {
       label: "Trip kit" },
     { name: "assist_track", group: "assist", kind: "itemrefs", def: [], hidden: true,
       sync: "assist_track", label: "Tracked items" },
-
     { name: "assist_auto_track", group: "assist", kind: "bool", def: false, hidden: true,
       label: "Track the best items" },
     { name: "assist_best_n", group: "assist", kind: "int", def: 2, min: 1, max: 10, hidden: true,
@@ -516,15 +504,13 @@ const Settings = (() => {
 
   function migrate(stored) {
     const v = Number(stored.__v || 1);
-    let out = Object.assign({}, stored);
+    const out = Object.assign({}, stored);
     if (v < 2) {
-
       out.torn_key = out.torn_key || Env.read("torn_key", "") || "";
       out.oracle_token = out.oracle_token || Env.read("token", "") || "";
       if (Array.isArray(out.countries) && !out.plan_countries) {
         out.plan_countries = out.countries;
       }
-
       if (out.escort_on === undefined) out.escort_on = Env.read("escort", false) === true;
     }
     return out;
@@ -686,7 +672,7 @@ const Settings = (() => {
 
   function importShared(text) {
     let blob;
-    try { blob = JSON.parse(text); } catch (e) { return null; }
+    try { blob = JSON.parse(text); } catch { return null; }
     if (!blob || typeof blob !== "object" || !blob[SHARE_MARK]) return null;
     let applied = 0;
     let skipped = 0;
@@ -784,7 +770,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.12";
+  const SCRIPT_VERSION = "2.6.13";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -852,7 +838,7 @@ const Oracle = (() => {
             Bus.emit("oracle:update");
           }
           let payload = null;
-          try { payload = JSON.parse(res.responseText); } catch (e) {  }
+          try { payload = JSON.parse(res.responseText); } catch {}
           if (res.status >= 200 && res.status < 300) {
             consecutiveFailures = 0;
             if (!payload) { reject(new OracleError(res.status, "bad_json", friendly("bad_json"))); return; }
@@ -866,7 +852,6 @@ const Oracle = (() => {
             backoffUntil = Date.now() + retry * 1000;
           }
           consecutiveFailures += 1;
-
           reject(new OracleError(res.status, code, friendly(code),
                                  { serverMessage: err.message || null, detail: err }));
         },
@@ -1028,7 +1013,6 @@ const Account = (() => {
       at = Date.now();
       Bus.emit("account", state());
     } catch (err) {
-
       Env.log.warn("account read failed", err.message);
     } finally {
       loading = false;
@@ -1107,7 +1091,6 @@ const PlanSync = (() => {
     const mineFp = JSON.stringify(mine);
     if (remote.revision === h.rev && mineFp === h.fp) return;
     const theirs = live(remote.plan);
-
     const merged = remote.revision === h.rev ? mine
       : mineFp === h.fp ? theirs
         : merge(mine, theirs, remote.updated_at ? Date.parse(remote.updated_at) : 0);
@@ -1194,7 +1177,6 @@ const SettingsSync = (() => {
   function toWire(row, v) {
     if (row.pct) return v / 100;
     if (row.kind === "types") {
-
       const list = row.name === "item_types" && !v.length ? Data.ITEM_TYPES : v;
       return list.map((t) => t.toLowerCase());
     }
@@ -1225,7 +1207,6 @@ const SettingsSync = (() => {
       pulledAt = Date.now();
       lastError = null;
     } catch (err) {
-
       const refused = err.status >= 400 && err.status < 500 && err.status !== 429;
       if (!refused) names.forEach((n) => pending.add(n));
       lastError = err.message;
@@ -1252,7 +1233,6 @@ const SettingsSync = (() => {
       const changes = {};
       for (const row of rows()) {
         if (pending.has(row.name)) continue;
-
         if (row.group === "assist" && remote[row.sync] === null
             && JSON.stringify(Settings.get(row.name)) !== JSON.stringify(row.def)) {
           pending.add(row.name);
@@ -1357,7 +1337,6 @@ const Phase = (() => {
     }
     if (state === "Abroad") return "abroad";
     if (state === "Okay") return "home";
-
     return null;
   }
 
@@ -1411,7 +1390,6 @@ const Phase = (() => {
       if (k < 1 || (maxUnits > 0 && k > maxUnits)) continue;
       const residual = Math.abs(drop - k * cost);
       if (residual > Math.max(cost * IDENTIFY_TOLERANCE, 1)) continue;
-
       fits.push({
         error: residual / cost,
         rank: preferRank(item.itemId, preferIds),
@@ -1425,9 +1403,7 @@ const Phase = (() => {
   function uniqueFit(fits) {
     if (!fits || !fits.length) return null;
     const best = fits[0];
-
     if (best.rank !== UNEXPECTED_RANK) return best;
-
     return fits.length === 1 ? best : null;
   }
 
@@ -1463,7 +1439,6 @@ const Torn = (() => {
   "use strict";
 
   const BASE = "https://api.torn.com/v2";
-
   const COMMENT = "Oracle Travel";
 
   const RPM_BUDGET = 40;
@@ -1494,8 +1469,8 @@ const Torn = (() => {
 
   let keyState = "unknown";
   let lastError = null;
-
   let verdictFor = null;
+  let limitedUntil = 0;
 
   function budgetLeft() {
     const cutoff = Date.now() - WINDOW_MS;
@@ -1516,12 +1491,10 @@ const Torn = (() => {
   }
 
   class TornError extends Error {
-
     constructor(code, message, raw) {
       super(message);
       this.code = code;
       this.raw = raw || null;
-
       this.fatal = FATAL_KEY.has(code) || ACCESS_LEVEL.has(code) || DAILY_CAP.has(code);
     }
   }
@@ -1549,7 +1522,7 @@ const Torn = (() => {
         onload: (res) => {
           let payload;
           try { payload = JSON.parse(res.responseText); }
-          catch (e) { reject(new TornError(-1, "Torn sent something that was not JSON.")); return; }
+          catch { reject(new TornError(-1, "Torn sent something that was not JSON.")); return; }
           if (payload && payload.error) {
             const code = Number(payload.error.code);
             reject(new TornError(code, friendly(code),
@@ -1580,7 +1553,7 @@ const Torn = (() => {
     const shared = inflight.get(cacheKey);
     if (shared) return shared;
 
-    if (!priority && budgetLeft() <= 2) {
+    if (Date.now() < limitedUntil || (!priority && budgetLeft() <= 2)) {
       const hit = cache.get(cacheKey);
       if (hit) return hit.payload;
       throw new TornError(-2, "Holding off on Torn API calls for a moment.");
@@ -1601,6 +1574,7 @@ const Torn = (() => {
         if (FATAL_KEY.has(err.code)) keyState = "invalid";
         else if (PAUSED.has(err.code)) keyState = "paused";
         else if (DAILY_CAP.has(err.code)) keyState = "capped";
+        else if (RATE_LIMITED.has(err.code)) limitedUntil = Date.now() + WINDOW_MS;
         Env.log.warn("Torn " + path + " failed", err.message);
         throw err;
       })
@@ -1611,7 +1585,6 @@ const Torn = (() => {
   }
 
   const api = {
-
     basic: () => get("user/basic", { ttl: 0, priority: true }),
 
     travel: () => get("user/travel", { ttl: 0, priority: true }),
@@ -1643,7 +1616,6 @@ const Torn = (() => {
     const query = new URLSearchParams({ comment: COMMENT, key: candidate });
     const url = BASE + "/user/basic?" + query.toString();
     return new Promise((resolve) => {
-
       if (!Env.caps.xhr) {
         resolve({ ok: false, message: "This userscript manager cannot reach the "
                                     + "Torn API. Tampermonkey, Violentmonkey and "
@@ -1655,7 +1627,7 @@ const Torn = (() => {
         onload: (res) => {
           let payload;
           try { payload = JSON.parse(res.responseText); }
-          catch (e) { resolve({ ok: false, message: "Torn sent something unreadable." }); return; }
+          catch { resolve({ ok: false, message: "Torn sent something unreadable." }); return; }
           if (payload && payload.error) {
             resolve({ ok: false, message: friendly(Number(payload.error.code)) });
             return;
@@ -1687,6 +1659,7 @@ const Torn = (() => {
     keyState = "unknown";
     verdictFor = null;
     lastError = null;
+    limitedUntil = 0;
   }
 
   return Object.assign(api, { get, verify, health, haveKey, forget, TornError });
@@ -1696,13 +1669,10 @@ const Trip = (() => {
   "use strict";
 
   const STORE_KEY = "trip";
-
   const VERSION = 2;
 
   const LATE_SOFT_MS = 5 * 60_000;
-
   const LATE_HARD_MS = 20 * 60_000;
-
   const LATE_GRACE_MS = 60_000;
 
   const STALE_MS = 100_000;
@@ -1726,26 +1696,19 @@ const Trip = (() => {
       country: null,
       from: null,
       arrivalAt: null,
-
       racing: false,
-
       preserved: 0,
-
       endsAt: null,
-
       offPlan: null,
-
       journal: [],
       planNote: null,
       createdAt: 0,
-
       shapedAt: 0,
     };
   }
 
   function legRuntime() {
     return {
-
       status: "pending",
       departedAt: null,
       landedAt: null,
@@ -1754,19 +1717,14 @@ const Trip = (() => {
       arrivalAt: null,
       boughtQty: null,
       spend: null,
-
       paidCost: null,
-
       item: null,
-
       flewTo: null,
       ambiguous: null,
       baseline: null,
       weakBaseline: false,
-
       rebaseAt: null,
       shelf: null,
-
       extra: [],
     };
   }
@@ -1775,7 +1733,6 @@ const Trip = (() => {
     const stored = migrate(Env.read(STORE_KEY, null));
     if (stored && stored.__v === VERSION && Array.isArray(stored.legs)) {
       state = Object.assign(blank(), stored);
-
       const last = state.legs.length ? state.legs[state.legs.length - 1].home_again : 0;
       if (state.active && last && Date.now() - last > 12 * 3600_000) {
         Env.log.info("Discarded a plan whose last run ended over 12 hours ago.");
@@ -1791,7 +1748,6 @@ const Trip = (() => {
     if (!stored || typeof stored !== "object") return stored;
 
     if (stored.__v === 1) {
-
       stored.runtime = (Array.isArray(stored.runtime) ? stored.runtime : [])
         .map((rt) => Object.assign(legRuntime(), rt, {
           item: null, baseline: null, weakBaseline: false, shelf: null,
@@ -1805,7 +1761,8 @@ const Trip = (() => {
   }
 
   function save() {
-    state.savedAt = Date.now();
+    const stored = Env.read(STORE_KEY, null);
+    state.savedAt = Math.max(Date.now(), ((stored && stored.savedAt) || 0) + 1);
     Env.write(STORE_KEY, state);
   }
 
@@ -1815,7 +1772,6 @@ const Trip = (() => {
     if (state !== null && !((stored.savedAt || 0) > (state.savedAt || 0))) return false;
     const before = shape();
     state = Object.assign(blank(), stored);
-
     if (shape() !== before) revision += 1;
     return true;
   }
@@ -1884,10 +1840,8 @@ const Trip = (() => {
     const keepRuntime = s.runtime.slice(0, n);
     s.legs = keep.concat(tailLegs);
     s.runtime = keepRuntime.concat(tailLegs.map(legRuntime));
-
     s.cursor = Math.min(s.cursor, keep.length);
     s.offPlan = null;
-
     s.planNote = note || null;
     s.preserved = n;
     s.shapedAt = Date.now();
@@ -2029,7 +1983,6 @@ const Trip = (() => {
   }
 
   function apply(obs) {
-
     sync();
     const s = get();
     const now = obs.at || Date.now();
@@ -2052,7 +2005,6 @@ const Trip = (() => {
 
     s.from = nextPhase === "inbound" ? originOf(obs.description, prevPhase, s) : null;
     if (!hospAbroad) s.country = Phase.liveCountryCode(obs.state, obs.description);
-
     s.arrivalAt = (nextPhase === "outbound" || nextPhase === "inbound")
       ? (obs.arrivalAt || s.arrivalAt) : null;
 
@@ -2072,13 +2024,11 @@ const Trip = (() => {
     if (obs.arrivalAt) rememberArrival(obs.arrivalAt);
 
     if (nextPhase === "abroad") {
-
       const bought = detectBuy(obs);
       if (bought) events.push(bought);
     } else if (nextPhase === "outbound"
                && Phase.flightDirection(obs.description) === "outbound"
                && typeof obs.wallet === "number") {
-
       openBaseline(obs.wallet);
     }
 
@@ -2106,7 +2056,6 @@ const Trip = (() => {
     const i = currentIndex();
     if (i < 0) return;
     const rt = s.runtime[i];
-
     if (weak && rt.baseline !== null) return;
     rt.baseline = typeof wallet === "number" ? wallet : null;
     rt.weakBaseline = rt.baseline === null ? false : !!weak;
@@ -2116,7 +2065,6 @@ const Trip = (() => {
     const s = get();
     const i = currentIndex();
     if (i < 0) return;
-
     if (s.runtime[i].status === "enroute" || s.runtime[i].status === "returning") {
       s.runtime[i].arrivalAt = arrivalAt;
     }
@@ -2133,12 +2081,10 @@ const Trip = (() => {
       }
       const leg = s.legs[i];
       const flying = s.country;
-
       if (flying && flying !== leg.country) {
         s.offPlan = { expected: leg.country, actual: flying, at: now };
         s.runtime[i].status = "enroute";
         s.runtime[i].departedAt = now;
-
         s.runtime[i].flewTo = flying;
         journal("offplan", "Flying to " + Data.name(flying) + ", not "
                            + Data.name(leg.country) + " as planned.");
@@ -2146,7 +2092,6 @@ const Trip = (() => {
       }
       s.runtime[i].status = "enroute";
       s.runtime[i].departedAt = now;
-
       openBaseline(live ? obs.wallet : null);
       journal("departed", "Departed for " + Data.name(leg.country) + ".");
       return [{ kind: "departed", leg: s_leg(i) }];
@@ -2156,7 +2101,6 @@ const Trip = (() => {
       if (i < 0) return [{ kind: "landed", offPlan: true }];
       s.runtime[i].status = "abroad";
       s.runtime[i].landedAt = now;
-
       openBaseline(live ? obs.wallet : null, true);
       journal("landed", "Landed in " + Data.name(legCountry(i)) + ".");
       return [{ kind: "landed", leg: s_leg(i) }];
@@ -2232,7 +2176,6 @@ const Trip = (() => {
     const leg = s.legs[i];
     if (rt.item) return rt.item;
     const planned = leg.unit_cost || 0;
-
     if (rt.paidCost !== null && rt.paidCost !== undefined) {
       return {
         id: leg.item_id, name: leg.item_name,
@@ -2317,7 +2260,6 @@ const Trip = (() => {
     const item = boughtItem(i);
     if (!(item.cost > 0)) return null;
     if (rt.baseline === null) {
-
       if (readAfter(obs, rt)) openBaseline(obs.wallet);
       return null;
     }
@@ -2392,7 +2334,6 @@ const Trip = (() => {
   function record(i, units, priceOverride, obs) {
     const s = get();
     const rt = s.runtime[i];
-
     if (!rt.item && priceOverride && priceOverride.cost > 0) {
       rt.paidCost = priceOverride.cost;
     }
@@ -2400,7 +2341,6 @@ const Trip = (() => {
     rt.boughtQty = units;
     rt.spend = units * item.cost;
     rt.ambiguous = null;
-
     if (typeof obs.wallet === "number") {
       rt.baseline = obs.wallet;
       rt.weakBaseline = false;
@@ -2415,7 +2355,6 @@ const Trip = (() => {
     const entry = (s.runtime[i].shelf || []).find((row) => row.itemId === hit.itemId);
     const sell = entry ? Data.unitSell(entry.value, entry.sell, Settings.get("sell_to"), entry.name) : null;
     if (sell === null) {
-
       return ask(i, drop, hit.units, hit);
     }
     const margin = sell - hit.cost;
@@ -2456,7 +2395,6 @@ const Trip = (() => {
     const wanted = answer && answer.itemId !== undefined && answer.itemId !== null
       ? Number(answer.itemId) : null;
     if (wanted !== null && wanted !== leg.item_id) {
-
       const hit = priced(rt, wanted, answer.item);
       if (hit) rt.item = Object.assign(hit, { swappedFrom: leg.item_name });
     } else if (wanted !== null) {
@@ -2475,11 +2413,9 @@ const Trip = (() => {
     rt.boughtQty = units;
     rt.spend = units * item.cost + rt.extra.reduce((n, e) => n + e.units * e.cost, 0);
     rt.ambiguous = null;
-
     if (rt.status === "done" || rt.status === "missed" || rt.status === "unconfirmed") {
       rt.status = unitsBought(rt) > 0 ? "done" : "missed";
     }
-
     rt.baseline = null;
     rt.weakBaseline = false;
     const said = [units > 0 ? units + "x " + item.name : null]
@@ -2520,7 +2456,6 @@ const Trip = (() => {
     const i = currentIndex();
     const leg = i < 0 ? null : s.legs[i];
     const rt = i < 0 ? null : s.runtime[i];
-
     const code = (leg && leg.country) || s.country;
     const flightMs = (Data.flightMinutes(code, Settings.get("travel_type")) || 0) * 60_000;
     const eta = (rt && rt.arrivalAt) || s.arrivalAt || null;
@@ -2530,11 +2465,9 @@ const Trip = (() => {
       return Math.max(now, eta || flown) + flightMs + LANDING_BUFFER_MS;
     }
     if (s.phase === "abroad") {
-
       return now + flightMs + LANDING_BUFFER_MS;
     }
     if (s.phase === "inbound") {
-
       const flown = rt && rt.leftAt ? rt.leftAt + flightMs : (leg ? now + flightMs : now);
       return Math.max(now, eta || flown) + LANDING_BUFFER_MS;
     }
@@ -2568,7 +2501,6 @@ const Trip = (() => {
         if (rt.status === "done") flown += 1;
       } else if (rt.status === "pending" || rt.status === "enroute"
                  || rt.status === "abroad") {
-
         expected += leg.units * (leg.unit_margin || 0);
       }
     }
@@ -2603,9 +2535,7 @@ const Tracker = (() => {
   const CLOSE_CADENCE = 15_000;
 
   const LEASE_KEY = "poll_lease";
-
   const LEASE_MS = 100_000;
-
   const IDLE_MS = 20_000;
 
   function leaseHolder() {
@@ -2642,17 +2572,14 @@ const Tracker = (() => {
   }
 
   function cadence() {
-
     if (!polling()) return IDLE_MS;
     const s = Trip.get();
     const base = CADENCE[s.phase || "unknown"] || CADENCE.unknown;
     const i = Trip.currentIndex();
     if (i >= 0) {
       const rt = s.runtime[i];
-
       if (rt.arrivalAt && rt.arrivalAt - Date.now() < CLOSE_MS) return CLOSE_CADENCE;
     }
-
     if (s.phase === "home" && i >= 0) {
       const due = s.legs[i].depart - Date.now();
       if (due > 0 && due < CLOSE_MS) return CLOSE_CADENCE;
@@ -2733,7 +2660,6 @@ const Tracker = (() => {
         const travel = (payload && payload.travel) || {};
         if (travel.arrival_at) obs.arrivalAt = Number(travel.arrival_at) * 1000;
       } catch (err) {
-
         Env.log.warn("travel read failed", err.message);
       }
     }
@@ -2751,7 +2677,6 @@ const Tracker = (() => {
                      : typeof m.money_onhand === "number" ? m.money_onhand : null;
         if (wallet !== null) obs.wallet = wallet;
       } catch (err) {
-
         Env.log.warn("money read failed", err.message);
       }
     }
@@ -2768,7 +2693,6 @@ const Tracker = (() => {
   }
 
   async function tick(steal) {
-
     if (running) {
       if (steal) pendingSteal = true;
       return;
@@ -2776,12 +2700,10 @@ const Tracker = (() => {
     running = true;
     try {
       lastGap = Env.Clock.markTick();
-
       if (lastGap && Env.Clock.sleptThrough(lastGap, cadence())) {
         Env.log.info("Tab was asleep for " + Math.round(lastGap / 1000)
                      + "s. Re-reading position.");
       }
-
       const dayMoved = Trip.sync();
       const settingsMoved = Settings.sync();
       const moved = dayMoved || settingsMoved;
@@ -2791,7 +2713,6 @@ const Tracker = (() => {
       if (claim(steal || arrived)) {
         if (Torn.haveKey()) await observe();
       } else if (moved) {
-
         emit({ error: null, events: [], phase: Trip.get().phase, followed: true });
       }
     } catch (e) {
@@ -2851,9 +2772,7 @@ const Alerts = (() => {
   };
 
   let fired = null;
-
   let unreported = [];
-
   const UNREPORTED_MAX = 640;
 
   function load() {
@@ -2879,7 +2798,6 @@ const Alerts = (() => {
     if (!stored || typeof stored !== "object") return all();
     const merged = Object.assign({}, stored, all());
     delete merged.__unreported;
-
     const theirs = Array.isArray(stored.__unreported) ? stored.__unreported : [];
     for (const key of theirs) if (unreported.indexOf(key) === -1) unreported.push(key);
     fired = merged;
@@ -2918,12 +2836,10 @@ const Alerts = (() => {
     for (const key of Object.keys(all())) {
       if (!key.startsWith(prefix)) { keep[key] = fired[key]; continue; }
       const seq = Number(key.slice(prefix.length).split(":")[0]);
-
       if (!isFinite(seq) || seq < index) keep[key] = fired[key];
       else dropped.push(seq);
     }
     fired = keep;
-
     if (dropped.length) {
       unreported = unreported.filter((key) => {
         const seq = Number(String(key).split(":")[0]);
@@ -2942,7 +2858,6 @@ const Alerts = (() => {
     const key = keyFor(kind, legIndex);
     if (already(kind, legIndex)) return false;
     if (!Settings.get("alerts_on") && !(options && options.always)) {
-
       all()[key] = Date.now();
       save();
       return false;
@@ -2960,13 +2875,11 @@ const Alerts = (() => {
 
     const spec = KINDS[kind] || { title: kind };
     const title = (options && options.title) || spec.title;
-
     const code = options && options.code;
     Env.toast(title, body, () => {
-      try { window.focus(); } catch (e) {  }
+      try { window.focus(); } catch {}
       if (code) Page.preselect(code);
     });
-
     Bus.emit("alert", { kind, legIndex, title, body, at: Date.now() });
     Env.log.event("alert: " + title + " — " + body);
     return true;
@@ -2991,7 +2904,6 @@ const Alerts = (() => {
           break;
         case "landed":
           if (ev.leg) {
-
             const flew = ev.leg.runtime.flewTo;
             fire("landed", idx, flew
               ? "Landed in " + Data.name(flew) + ", off plan. Buy what you came "
@@ -3002,7 +2914,6 @@ const Alerts = (() => {
           break;
         case "bought":
           if (ev.more) {
-
             break;
           }
           fire("bought", idx,
@@ -3015,7 +2926,6 @@ const Alerts = (() => {
           fire("ambiguous", idx, askText(ev));
           break;
         case "home": {
-
           const rt = ev.leg ? ev.leg.runtime : null;
           const carried = rt && Trip.unitsBought(rt) > 0;
           fire("home", idx, carried
@@ -3080,7 +2990,6 @@ const Alerts = (() => {
       fire("nearhome", i, Math.max(1, Math.round(left / 60_000)) + " minutes to Torn.");
       return;
     }
-
     const flew = s.runtime[i].flewTo;
     fire("approach", i,
          Math.max(1, Math.round(left / 60_000)) + " minutes to "
@@ -3093,7 +3002,6 @@ const Alerts = (() => {
     const out = unreported.slice();
     return {
       keys: out,
-
       ack: () => {
         unreported = unreported.filter((k) => !out.includes(k));
         save();
@@ -3131,9 +3039,7 @@ const Escort = (() => {
 
   let uploadError = null;
   let beatError = null;
-
   let needClear = false;
-
   let wasEnabled = null;
 
   const BEAT_GRACE_MS = 150_000;
@@ -3164,7 +3070,6 @@ const Escort = (() => {
     Env.write(HELD_KEY, {
       fp,
       delivery: (res && res.delivery) || null,
-
       until: (res && res.until) || null,
       at: Date.now(),
     });
@@ -3225,7 +3130,6 @@ const Escort = (() => {
 
   async function upload(legs) {
     if (!enabled() || !legs || !legs.length || finished(legs)) return;
-
     if (uploading) return;
     const fp = fingerprint(legs);
     const have = held();
@@ -3241,13 +3145,10 @@ const Escort = (() => {
       Env.log.info("Escort holds " + legs.length + " leg(s).");
       Bus.emit("escort", state());
     } catch (err) {
-
       forgetHeld();
-
       uploadError = err.code === "premium_required"
         ? "Alerts with the browser closed aren't available on this account yet."
         : err.message;
-
       Env.log.warn("escort upload failed", why(err));
       Bus.emit("escort", state());
     } finally {
@@ -3260,11 +3161,9 @@ const Escort = (() => {
     if (!Oracle.haveToken()) { forgetHeld(); needClear = false; return; }
     try {
       await Oracle.clearTrip();
-
       forgetHeld();
       needClear = false;
     } catch (err) {
-
       needClear = true;
       Env.log.warn("escort clear failed", why(err));
     }
@@ -3273,7 +3172,6 @@ const Escort = (() => {
 
   async function beat() {
     if (!enabled() || !alertsOn() || !Trip.get().active) return;
-
     if (!Tracker.polling()) return;
     const drain = Alerts.drainUnreported();
     try {
@@ -3281,10 +3179,8 @@ const Escort = (() => {
       drain.ack();
       lastBeatAt = Date.now();
       beatError = null;
-
       if (res && res.holding === false) forgetHeld();
     } catch (err) {
-
       beatError = err.message;
       Env.log.warn("heartbeat failed", err.message);
     }
@@ -3312,12 +3208,10 @@ const Escort = (() => {
     wasEnabled = on;
 
     if (on) {
-
       if (s.active && s.legs.length && (pressed || flipped || Tracker.polling())) {
         upload(s.legs);
       }
     } else if ((needClear || held()) && Oracle.haveToken()) {
-
       clear();
     }
 
@@ -3340,18 +3234,15 @@ const Escort = (() => {
 
   function explain() {
     if (!Oracle.haveToken()) {
-
       return { ok: false, text: "Account required. Configure credentials in Settings, "
                                 + "or use /token new on Discord." };
     }
     if (!Settings.get("escort_on")) {
       return { ok: true, text: "Disabled. Alerts only reach you while a Torn tab is open." };
     }
-
     if (Account.knownWithoutDiscord()) {
       return { ok: false, text: "Discord account not linked. Run /register on Discord with your Torn key." };
     }
-
     const have = held();
     const delivery = have ? have.delivery : null;
     if (delivery && delivery.discord === false) {
@@ -3363,7 +3254,6 @@ const Escort = (() => {
     const bad = trouble();
     if (bad) return { ok: false, text: bad };
     if (have) {
-
       const where = delivery && delivery.where === "dm"
         ? "in your Discord DMs"
         : "in your private thread on Discord";
@@ -3397,7 +3287,6 @@ function plannerCore() {
         return {
           at,
           hit: lo.hit + w * (hi.hit - lo.hit),
-
           shelf: (lo.shelf === null || hi.shelf === null)
             ? null : lo.shelf + w * (hi.shelf - lo.shelf),
         };
@@ -3418,7 +3307,6 @@ function plannerCore() {
 
   function doseDeparture(cfg, t) {
     const clear = doseClearAt(cfg);
-
     const cap = cfg.maxDrugPushMs || 0;
     if (clear === null || clear <= t || clear > t + cap) return null;
     return clear;
@@ -3485,12 +3373,10 @@ function plannerCore() {
       if (taken) {
         const remaining = stock - taken;
         if (remaining < 1) return null;
-
         buyCap = remaining;
         hit *= Math.min(1, remaining / stock);
       }
     }
-
     if (kind === "instock" && prep.stockQty > 0) {
       buyCap = buyCap === null ? prep.stockQty : Math.min(buyCap, prep.stockQty);
     }
@@ -3522,9 +3408,7 @@ function plannerCore() {
     const oneway = !!(terminal && cfg.endAbroad);
     if (kind === "instock") {
       if (!prep.inStockNow || prep.stockQty <= 0) return [];
-
       if (t > cfg.now) return [];
-
       const doseDepart = doseDeparture(cfg, t);
       const lands = [t + prep.flightMs];
       if (doseDepart !== null) lands.push(doseDepart + prep.flightMs);
@@ -3533,7 +3417,6 @@ function plannerCore() {
       for (const land of lands) {
         if (seen.has(land)) continue;
         seen.add(land);
-
         if (prep.selloutAt !== null && prep.selloutAt <= land) continue;
         const spec = specFromLanding(prep, t, cfg, cash, kind, land,
                                      windowAt(prep, land), oneway, shelf);
@@ -3592,7 +3475,6 @@ function plannerCore() {
         total = spec.profit;
         seq = [spec];
       } else {
-
         const nextCash = cash === null ? null : cash + spec.profit;
         const [sub, subSeq] = bestSequence(
           preps, spec.homeAgain, cfg, nextCash, depth - 1,
@@ -3622,7 +3504,6 @@ function plannerCore() {
       }
     }
     if (!best || best.profit <= 0) {
-
       if (cfg.doseStrict !== false && doseClearAt(cfg) !== null) {
         return terminalOneway(
           preps, t, Object.assign({}, cfg, { doseStrict: false }), cash, shelf);
@@ -3663,7 +3544,6 @@ function plannerCore() {
         if (cash !== null) cash += next.profit;
         continue;
       }
-
       let passCfg = cfg;
       let [, seq] = bestSequence(preps, t, passCfg, cash, cfg.depth, shelf);
       if (!seq.length && cfg.doseStrict !== false && doseClearAt(cfg) !== null) {
@@ -3677,10 +3557,8 @@ function plannerCore() {
         first = fillGap(preps, t, passCfg, cash, first, shelf) || first;
       }
       sorties.push(first);
-
       shelf = shelfBooked(shelf, shelfKey(first.prep, first.land), first.units);
       t = first.homeAgain;
-
       if (cash !== null) cash += first.profit;
     }
 
@@ -3697,14 +3575,13 @@ function plannerCore() {
     for (const it of items) {
       if (!it.forecast || !it.forecast.upcoming || !it.forecast.upcoming.length) continue;
       if (it.cost === null || it.cost === undefined) continue;
-
       const city = cfg.sellTo === "city";
       // Fork : bazaar au taux de la catégorie (taux traders Wardogs + 2 points, Car 92 %), pas la décote unique
       const BAZAAR = {"flower": 1.0, "plushie": 1.0, "temporary": 0.97, "drug": 0.97, "alcohol": 0.97, "candy": 0.97, "booster": 0.97, "energy drink": 0.97, "supply pack": 0.97, "tool": 0.92, "material": 0.92, "medical": 0.92, "enhancer": 0.92, "special": 0.92, "artifact": 0.92, "car": 0.92, "defensive": 0.82, "primary": 0.82, "secondary": 0.82, "melee": 0.82, "jewelry": 0.82, "clothing": 0.27, "other": 0.27};
       const players = it.market_value > 0
         ? it.market_value * (BAZAAR[(it.type || "").trim().toLowerCase()] ?? 0.27) : null;
       // Fork : prix de rachat en ville seulement si une boutique de Torn rachète l'objet (Xanax : aucune)
-      const RACHAT = ["9mm Uzi", "AK-47", "African Violet", "Afro Comb", "Ambergris Lump", "ArmaLite M-15A4", "Axe", "BT MP9", "Banana Orchid", "Bear Gall", "Bearer Bond", "Bikini", "Blowgun", "Bo Staff", "Bottle of Sake", "Bottle of Tequila", "Bushmaster Carbon 15", "Camel Plushie", "Ceibo Flower", "Chain Whip", "Chamois Plushie", "Cherry Blossom", "Chopsticks", "Claymore Mine", "Claymore Sword", "Cobra Derringer", "Coconut Bra", "Combat Boots", "Combat Gloves", "Combat Helmet", "Combat Pants", "Combat Vest", "Compass", "Construction Helmet", "Counterfeit Manga", "Crazy Straw", "Cricket Bat", "Crocus", "Crossbow", "Dahlia", "Dart Board", "Desert Eagle", "Diamond Bladed Knife", "Diving Gloves", "Edelweiss", "Elephant Statue", "Enfield SA-80", "Ephedrine Powder", "Ergotamine Ampoule", "Fire Hydrant", "Fireworks", "Flail", "Flak Jacket", "Flamethrower", "Flare Gun", "Flash Grenade", "Flexible Body Armor", "Flippers", "Frying Pan", "Grenade", "Guandao", "HEG", "Harpoon", "Heather", "Heckler & Koch SL8", "Hockey Stick", "Hydrochloric Acid", "Ice Pick", "Insulin", "Ithaca 37", "Jackhammer", "Jade Buddha", "Jaguar Plushie", "Kabuki Mask", "Kama", "Katana", "Kevlar Gloves", "Knuckle Dusters", "Kodachi", "Large Suitcase", "Leather Bullwhip", "Lion Plushie", "Liquid Body Armor", "Lorcin 380", "M249 SAW", "Macana", "Mag 7", "Maneki Neko", "Mayan Statue", "Medium Suitcase", "Metal Nunchaku", "Minigun", "Model Space Ship", "Monkey Plushie", "Mountie Hat", "Natural Pearls", "Naval Cutlass", "Nessie Plushie", "Neumune Tablet", "Ninja Claws", "Ninja Star", "Nodding Turtle", "Orchid", "Outer Tactical Vest", "Panda Plushie", "Pangolin Scales", "Paper Weight", "Pele Charm", "Peony", "Proda Sunglasses", "Qsz-92", "Raw Ivory", "Red Fox Plushie", "SIG 552", "SKS Carbine", "Safety Boots", "Safrole Oil", "Sai", "Samurai Sword", "Sensu", "Sextant", "Shark Fin", "Ship in a Bottle", "Small Suitcase", "Smoke Grenade", "Snorkel", "Snowboard", "Soccer Ball", "Spear", "Speedo", "Sports Shades", "Springfield 1911", "Steel Drum", "Stick Grenade", "Stingray Plushie", "Sumo Doll", "Swiss Army Knife", "Tailor's Dummy", "Taser", "Taurus PT92", "Tavor TAR-21", "Tear Gas", "Throwing Knife", "Tiger Bone Powder", "Trench Coat", "Tribulus Omanense", "Trout", "Turtle Shell", "Twin Tiger Hooks", "Type 98 Anti Tank", "Uncut Diamonds", "Vektor CR-21", "WWII Helmet", "Wetsuit", "Whale Meat", "Wolverine Plushie", "Wooden Nunchaku", "Wushu Double Axes", "Yakitori Lantern", "Yucca Plant"];
+      const RACHAT = ["9mm Uzi", "AK-47", "African Violet", "Afro Comb", "Ambergris Lump", "ArmaLite M-15A4", "Axe", "BT MP9", "Banana Orchid", "Bear Gall", "Bearer Bond", "Bikini", "Blowgun", "Bo Staff", "Bottle of Sake", "Bottle of Tequila", "Bushmaster Carbon 15", "Camel Plushie", "Ceibo Flower", "Chain Whip", "Chamois Plushie", "Cherry Blossom", "Chopsticks", "Claymore Mine", "Claymore Sword", "Cobra Derringer", "Coconut Bra", "Combat Boots", "Combat Gloves", "Combat Helmet", "Combat Pants", "Combat Vest", "Compass", "Counterfeit Manga", "Crazy Straw", "Cricket Bat", "Crocus", "Crossbow", "Dahlia", "Dart Board", "Desert Eagle", "Diamond Bladed Knife", "Diving Gloves", "Edelweiss", "Elephant Statue", "Enfield SA-80", "Ephedrine Powder", "Ergotamine Ampoule", "Fire Hydrant", "Fireworks", "Flail", "Flak Jacket", "Flamethrower", "Flare Gun", "Flash Grenade", "Flexible Body Armor", "Flippers", "Frying Pan", "Grenade", "Guandao", "HEG", "Harpoon", "Heather", "Heckler & Koch SL8", "Hockey Stick", "Hydrochloric Acid", "Ice Pick", "Insulin", "Ithaca 37", "Jackhammer", "Jade Buddha", "Jaguar Plushie", "Kabuki Mask", "Kama", "Katana", "Kevlar Gloves", "Knuckle Dusters", "Kodachi", "Large Suitcase", "Leather Bullwhip", "Lion Plushie", "Liquid Body Armor", "Lorcin 380", "M249 SAW", "Macana", "Mag 7", "Maneki Neko", "Mayan Statue", "Medium Suitcase", "Metal Nunchaku", "Minigun", "Model Space Ship", "Monkey Plushie", "Mountie Hat", "Natural Pearls", "Naval Cutlass", "Nessie Plushie", "Neumune Tablet", "Ninja Claws", "Ninja Star", "Nodding Turtle", "Orchid", "Outer Tactical Vest", "Panda Plushie", "Pangolin Scales", "Paper Weight", "Pele Charm", "Peony", "Proda Sunglasses", "Qsz-92", "Raw Ivory", "Red Fox Plushie", "SIG 552", "SKS Carbine", "Safety Boots", "Safrole Oil", "Sai", "Samurai Sword", "Sensu", "Sextant", "Shark Fin", "Ship in a Bottle", "Small Suitcase", "Smoke Grenade", "Snorkel", "Snowboard", "Soccer Ball", "Spear", "Speedo", "Sports Shades", "Springfield 1911", "Steel Drum", "Stick Grenade", "Stingray Plushie", "Sumo Doll", "Swiss Army Knife", "Tailor's Dummy", "Taser", "Taurus PT92", "Tavor TAR-21", "Tear Gas", "Throwing Knife", "Tiger Bone Powder", "Trench Coat", "Tribulus Omanense", "Trout", "Turtle Shell", "Twin Tiger Hooks", "Type 98 Anti Tank", "Uncut Diamonds", "Vektor CR-21", "WWII Helmet", "Wetsuit", "Whale Meat", "Wolverine Plushie", "Wooden Nunchaku", "Wushu Double Axes", "Yakitori Lantern", "Yucca Plant"];
       const sellPrice = RACHAT.indexOf(it.name) !== -1 ? it.sell_price : 0;
       const value = city ? sellPrice
         : cfg.sellTo === "best" ? Math.max(sellPrice > 0 ? sellPrice : 0, players || 0)
@@ -3712,7 +3589,6 @@ function plannerCore() {
       if (!value || value <= 0) continue;
       if (cfg.maxCost !== null && it.cost > cfg.maxCost) continue;
       const type = (it.type || "").trim().toLowerCase();
-
       if (cfg.includeTypes && cfg.includeTypes.indexOf(type) === -1) continue;
       if (cfg.excludeTypes && cfg.excludeTypes.indexOf(type) !== -1) continue;
       if (cfg.excludeItems && cfg.excludeItems.indexOf(it.item_id) !== -1) continue;
@@ -3802,7 +3678,6 @@ function plannerCore() {
       land_by: s.landBy,
       hit: s.hit,
       one_way: !!s.oneWay,
-
       dose: clear !== null && s.depart === clear,
     }));
   }
@@ -3843,9 +3718,7 @@ const Plan = (() => {
   let lastAutoAt = 0;
   let lastError = null;
   let worker = null;
-
   let choices = null;
-
   let searchSeq = 0;
 
   function workerSource() {
@@ -3858,7 +3731,7 @@ const Plan = (() => {
       const blob = new Blob([workerSource()], { type: "application/javascript" });
       worker = new Worker(URL.createObjectURL(blob));
       return worker;
-    } catch (e) {
+    } catch {
       Env.log.info("Worker unavailable (page CSP); planning on the main thread.");
       worker = false;
       return false;
@@ -3885,7 +3758,6 @@ const Plan = (() => {
         else resolve(ev.data.legs);
       }
       w.addEventListener("message", onMessage);
-
       w.postMessage({ id, items: input.items, cfg: input.cfg, count: input.count || 0 });
     });
   }
@@ -3919,7 +3791,6 @@ const Plan = (() => {
   function config(originMs, seenAt, items, drugCooldownSecs, endTime) {
     const haveTypes = items.some((i) => i.type);
     const chosen = Settings.get("item_types");
-
     const includeTypes = (haveTypes && chosen && chosen.length)
       ? chosen.map((t) => t.toLowerCase())
       : null;
@@ -3942,14 +3813,11 @@ const Plan = (() => {
       includeTypes,
       excludeTypes,
       excludeItems: unpicked(items),
-
       cash: null,
       seenAt: seenAt ? Date.parse(seenAt) : originMs,
-
       beamWidth: 3,
       depth: 3,
       shelfDebit: true,
-
       prioritizeDrug: onCooldown > 0,
       drugCooldownSecs: onCooldown,
       maxDrugPushMs: Settings.get("max_drug_wait") * 60_000,
@@ -3957,13 +3825,12 @@ const Plan = (() => {
     };
   }
 
-  async function gather(originMs) {
+  async function gather() {
     const travel = Settings.get("travel_type");
     const codes = Settings.planCountries();
 
     const items = [];
     let seenAt = null;
-
     let failedCountries = 0;
     let forecastError = null;
 
@@ -3983,9 +3850,7 @@ const Plan = (() => {
       } catch (err) {
         missing.push(codes[n]);
         Env.log.warn("shelf for " + codes[n] + " failed", err.message);
-
         if (GLOBAL_FAILURE.has(err.code) || ++shelfRun >= 2) {
-
           if (read === 0) throw err;
           for (let m = n + 1; m < codes.length; m++) missing.push(codes[m]);
           break;
@@ -3997,7 +3862,6 @@ const Plan = (() => {
         const batch = await Oracle.forecasts(codes[n], { travel });
         forecasts = batch.forecasts || {};
       } catch (err) {
-
         failedCountries += 1;
         if (forecastError === null) forecastError = err.message;
         Env.log.warn("forecasts for " + codes[n] + " failed", err.message);
@@ -4025,7 +3889,6 @@ const Plan = (() => {
 
     return {
       items, seenAt, forecastError, missing,
-
       allForecastsFailed: read > 0 && failedCountries === read,
       someForecastsFailed: failedCountries > 0,
     };
@@ -4051,7 +3914,6 @@ const Plan = (() => {
   }
 
   async function replanTail(reason) {
-
     if (!Trip.get().active) return { skipped: "no_plan" };
     if (Trip.get().endsAt && Date.now() >= Trip.get().endsAt) return { skipped: "ended" };
     const gate = Trip.canReplan();
@@ -4068,7 +3930,6 @@ const Plan = (() => {
     Bus.emit("plan:start", { explicit, reason });
 
     try {
-
       const revision = Trip.revision();
 
       const origin = Math.max(Date.now(), Trip.earliestHome());
@@ -4078,14 +3939,13 @@ const Plan = (() => {
       const keepEnd = !fresh && t.endsAt && Date.now() < t.endsAt;
       const endTime = keepEnd ? t.endsAt : origin + Settings.get("end_hours") * 3600_000;
 
-      const gathered = await gather(origin);
+      const gathered = await gather();
       const { items, seenAt } = gathered;
 
       stage = "Searching for the best plan";
       Bus.emit("plan:stage", stage);
 
       const cooldown = await drugCooldown();
-
       const offer = explicit && fresh;
       const found = await runSearch({
         items, cfg: config(origin, seenAt, items, cooldown, endTime),
@@ -4101,7 +3961,6 @@ const Plan = (() => {
       }
 
       if (!legs || !legs.length) {
-
         lastError = gathered.allForecastsFailed && gathered.forecastError
           ? gathered.forecastError + " Without forecasts there is nothing to plan."
           : keepEnd
@@ -4132,7 +3991,6 @@ const Plan = (() => {
         Alerts.forgetOtherPlans();
       } else {
         Trip.replaceTail(legs, note, endTime);
-
         Alerts.forgetFrom(Trip.get().preserved);
       }
 
@@ -4191,7 +4049,6 @@ const Page = (() => {
 
   function mode() {
     if (document.body.dataset.traveling === "true") return "flight";
-
     if (abroadOnPage()) return "abroad";
     if (agencyOnPage() || blockedAgencyOnPage()) return "agency";
     return "other";
@@ -4250,7 +4107,6 @@ const Page = (() => {
   }
 
   function mountPoint(panel, currentMode) {
-
     const tt = currentMode === "flight" ? null : document.querySelector("#travelDestinations");
     if (tt && tt.parentNode) {
       return { parent: tt.parentNode, before: insertionPoint(tt, panel) };
@@ -4259,7 +4115,6 @@ const Page = (() => {
     if (root && root.parentNode) {
       return { parent: root.parentNode, before: insertionPoint(root, panel) };
     }
-
     const notice = document.querySelector(".info-msg-cont");
     if (notice && notice.parentNode) {
       return { parent: notice.parentNode, before: insertionPoint(notice, panel) };
@@ -4344,7 +4199,7 @@ const Page = (() => {
     if (!m || !Data.COUNTRIES[m[1]]) return;
     try {
       history.replaceState(null, "", location.pathname + location.search);
-    } catch (e) {  }
+    } catch {}
     linked = m[1];
     const until = Date.now() + LINK_HOLD_MS;
     let scrolled = preselect(linked);
@@ -4393,7 +4248,6 @@ const Page = (() => {
       onChange(next, changed);
     });
     observer.observe(document.body, { childList: true, subtree: true });
-
     const stop = setTimeout(() => observer.disconnect(), 30_000);
     return () => { clearTimeout(stop); observer.disconnect(); };
   }
@@ -4472,25 +4326,41 @@ const Page = (() => {
       if (!id || !row) continue;
       const nameEl = row.querySelector('button[aria-controls$="-itemInfoWrapper"]');
       let stock = null;
+      let type = "";
       for (const label of row.querySelectorAll("span")) {
-        if (label.textContent.trim() !== "stock" || !label.parentElement) continue;
-        stock = Number(label.parentElement.textContent.replace(/\D/g, ""));
-        break;
+        const key = label.textContent.trim();
+        const cell = label.parentElement;
+        if (!cell) continue;
+        if (key === "stock" && stock === null) stock = Number(cell.textContent.replace(/\D/g, ""));
+        else if (key === "type" && !type) type = cell.textContent.replace(label.textContent, "").trim();
       }
       if (stock === null || !isFinite(stock)) continue;
-      out.push({ id, name: nameEl ? nameEl.textContent.trim() : "", stock, price: rowPrice(row) });
+      out.push({ id, name: nameEl ? nameEl.textContent.trim() : "", type, stock, price: rowPrice(row) });
     }
     return out;
   }
 
   function shopWallet() {
+    const inv = travelInventory();
     for (const msg of document.querySelectorAll("#travel-root .msg")) {
-      const text = msg.textContent || "";
-      const money = /have \$([\d,]+)/.exec(text);
-      const used = /(?:purchased|carrying) (\d+) \/ (\d+)/.exec(text);
-      if (money && used) {
-        return { money: Number(money[1].replace(/,/g, "")),
-                 taken: Number(used[1]), capacity: Number(used[2]) };
+      let money = null;
+      const counts = [];
+      for (const b of msg.querySelectorAll("strong")) {
+        const text = b.textContent.trim();
+        const cash = /^\$([\d,]+)$/.exec(text);
+        if (cash && money === null) money = Number(cash[1].replace(/,/g, ""));
+        const count = /^(\d+) \/ (\d+)$/.exec(text);
+        if (count) counts.push([Number(count[1]), Number(count[2])]);
+      }
+      if (money === null) continue;
+      if (inv) {
+        return { money, taken: inv.packed, capacity: inv.slots, extra: inv.special,
+                 extraType: inv.specialType || Settings.get("extra_type") };
+      }
+      if (counts.length) {
+        const [[taken, capacity], more] = counts;
+        return { money, taken, capacity, extra: more ? Math.max(0, more[1] - more[0]) : 0,
+                 extraType: Settings.get("extra_type") };
       }
     }
     return null;
@@ -5125,7 +4995,7 @@ const Style = (() => {
 `;
 
   function install() {
-    if (Env.caps.style) { try { GM_addStyle(CSS); return; } catch (e) {  } }
+    if (Env.caps.style) { try { GM_addStyle(CSS); return; } catch {} }
     const tag = document.createElement("style");
     tag.textContent = CSS;
     (document.head || document.documentElement).appendChild(tag);
@@ -5307,7 +5177,6 @@ const Fmt = (() => {
     }
     const ms = at - Date.now();
     const range = until && until > at ? esc(clock(at)) + "–" + esc(clock(until)) : esc(clock(at));
-
     if (ms <= 0 && until && until > Date.now() && !stale(seenAt)) {
       return `<span class="clock">${range}</span>`
            + `<span class="o-sub${qty > 0 ? "" : " warn"}">${qty > 0 ? "in stock" : "due now"}</span>`;
@@ -5323,7 +5192,6 @@ const Fmt = (() => {
         : '<span class="warn">due now</span>'
           + `<span class="o-sub">${esc(clock(at))}</span>`;
     }
-
     return `<span class="clock">${range}</span>`
          + `<span class="o-sub" data-live="in" data-to="${at}"`
          + `${until && until > at ? ` data-until="${until}"` : ""}`
@@ -5360,7 +5228,6 @@ const Fmt = (() => {
   const DISCORD_URL = "https://discord.gg/uCkYscEJzr";
   const discord = () =>
     `<a class="o-out" href="${DISCORD_URL}" target="_blank" rel="noopener">Discord</a>`;
-
   const linkDiscord = (html) => html.replace(/\bon Discord\b/, "on " + discord());
 
   return { discord, linkDiscord, esc, clock, countdown, ago, duration, money, price, count, pct, hitPct, bestLanding,
@@ -5383,7 +5250,6 @@ const Panel = (() => {
   let bodyEl = null;
   let current = null;
   let secondTimer = null;
-
   const fetchedAt = {};
 
   function register(view) { views.push(view); }
@@ -5432,7 +5298,6 @@ const Panel = (() => {
     root.querySelector('[data-act="refresh"]').addEventListener("click", (ev) => {
       ev.stopPropagation();
       Tracker.poke();
-
       fetchData(true);
       renderCurrent();
     });
@@ -5599,7 +5464,6 @@ const Panel = (() => {
       pane.classList.toggle("is-on", pane.dataset.view === view.id);
     }
     renderCurrent();
-
     fetchData(false);
   }
 
@@ -5699,7 +5563,6 @@ const Panel = (() => {
     }
     if (rt.status === "enroute") {
       const eta = rt.arrivalAt;
-
       return { dot: "live",
                text: "Flying to " + Data.name(Trip.legCountry(i))
                      + (eta ? " · lands in " + Fmt.countdown(eta - now) : "") };
@@ -5707,7 +5570,6 @@ const Panel = (() => {
     if (rt.status === "abroad") {
       if (rt.ambiguous) return { dot: "warn", text: "Confirm purchase details." };
       if (Trip.unitsBought(rt)) return { dot: "live", text: "Purchase recorded. Fly home." };
-
       if (rt.flewTo) return { dot: "warn", text: "In " + Data.name(rt.flewTo) + " · off plan" };
       return { dot: "live", text: "Buy " + leg.units + "x " + leg.item_name };
     }
@@ -5736,7 +5598,6 @@ const Panel = (() => {
   function fetchData(force) {
     if (!current || typeof current.refresh !== "function") return;
     if (!root || root.classList.contains("o-collapsed")) return;
-
     if (root.isConnected === false) return;
     if (!Env.visible()) return;
     if (!force) {
@@ -5756,12 +5617,10 @@ const Panel = (() => {
       if (tipFor && !tipFor.isConnected) hideTip();
       if (!current || !root || root.classList.contains("o-collapsed")) return;
       const pane = paneFor(current.id);
-
       if (pendingRender && pane && !typingIn(pane)) renderCurrent();
       if (pane && current.tick) {
-        try { current.tick(pane); } catch (e) {  }
+        try { current.tick(pane); } catch {}
       }
-
       fetchData(false);
     }, 1000);
   }
@@ -5878,7 +5737,6 @@ const ViewPlan = (() => {
     }
 
     const parts = [];
-
     if (Trip.racing(now)) parts.push(raceBanner());
     parts.push(whereBlock(now), doBlock(now));
 
@@ -5929,7 +5787,6 @@ const ViewPlan = (() => {
     if (!s.active || i < 0) {
       if (s.active && i < 0) {
         const v = Trip.value();
-
         const owed = v.unresolved
           ? " " + Fmt.plural(v.unresolved, "run") + " still to record."
           : "";
@@ -5941,11 +5798,9 @@ const ViewPlan = (() => {
 
     const leg = s.legs[i];
     const rt = s.runtime[i];
-
     const what = Fmt.esc(leg.units) + " x " + Fmt.esc(leg.item_name);
     const code = Trip.legCountry(i);
     const where = Flags.place(code);
-
     const offPlan = rt.flewTo !== null && rt.flewTo !== undefined;
 
     if (rt.ambiguous) {
@@ -5953,7 +5808,6 @@ const ViewPlan = (() => {
     }
 
     if (rt.status === "pending") {
-
       if (Plan.offered()) return "";
       const late = Trip.lateness(now);
       if (late) {
@@ -5976,7 +5830,6 @@ const ViewPlan = (() => {
     }
 
     if (rt.status === "enroute") {
-
       const flight = (Data.flightMinutes(code, Settings.get("travel_type")) || 0) * 60_000;
       const land = rt.arrivalAt || (rt.departedAt + flight);
       const from = rt.departedAt || (land - flight);
@@ -6189,7 +6042,6 @@ const ViewPlan = (() => {
       const take = exp ? `<span class="o-sub">Take ${Fmt.esc(exp.units)} x ${Fmt.esc(exp.name)} `
         + `<span class="go">+${Fmt.esc(Fmt.money(exp.profit))}</span></span>` : "";
       const editable = rt.landedAt !== null;
-
       const landAt = rt.landedAt || (rt.status === "enroute" && rt.arrivalAt) || leg.land;
       const homeAt = rt.homeAt || (rt.status === "returning" && rt.arrivalAt) || leg.home_again;
 
@@ -6285,14 +6137,12 @@ const ViewPlan = (() => {
     if (!s.active) return "";
 
     const out = [];
-
     const open = s.runtime.findIndex((rt) => rt.ambiguous);
     if (open >= 0 && open !== Trip.currentIndex()) {
       out.push(`<div class="o-note is-warn">Record what you bought in
         ${Fmt.esc(Data.name(Trip.legCountry(open)))}.
         <button type="button" class="o-link" data-act="edit-buy" data-leg="${open}">Record</button></div>`);
     }
-
     if (s.planNote && !Trip.started()) {
       out.push(`<div class="o-note">${Fmt.esc(s.planNote)}</div>`);
     }
@@ -6485,13 +6335,10 @@ const ViewShops = (() => {
 
   const ROW_CAP = 14;
   const SHOP_EVERY_MS = 15_000;
-
   const FORECAST_EVERY_MS = 60_000;
 
   let country = null;
-
   let picked = null;
-
   let flight = null;
   let data = null;
   let loading = false;
@@ -6499,10 +6346,8 @@ const ViewShops = (() => {
   let forecastError = null;
   let expanded = false;
   let sortKey = "margin";
-
   const FOLD_KEY = "shop_folded";
   const folded = new Set(Env.read(FOLD_KEY, []));
-
   const BELLS_ON = !Env.suspendable;
   const BELL_KEY = "shop_bells";
   const BELL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>';
@@ -6520,7 +6365,7 @@ const ViewShops = (() => {
       const text = "Time to leave for " + b.name + " in " + Data.name(code) + ".";
       Assist.beep();
       Env.toast("Time to leave", text, () => {
-        try { window.focus(); } catch (e) {  }
+        try { window.focus(); } catch {}
         Page.preselect(code);
       });
       Panel.flash(text, "go", "shops");
@@ -6552,7 +6397,6 @@ const ViewShops = (() => {
   function currentCountry() {
     const t = Trip.get();
     const pos = Trip.position();
-
     if (pos.known && pos.phase === "outbound" && Data.COUNTRIES[t.country]) {
       const key = t.country + "@" + t.since;
       if (flight !== key) { flight = key; country = t.country; }
@@ -6560,7 +6404,6 @@ const ViewShops = (() => {
     if (country) return country;
     if (pos.phase === "abroad" && Data.COUNTRIES[t.country]) return t.country;
     if (pos.phase === "inbound" && Data.COUNTRIES[t.from]) return t.from;
-
     if (Settings.get("follow_page")) {
       const dest = Page.selectedDestination();
       if (dest && Data.COUNTRIES[dest]) return dest;
@@ -6598,7 +6441,6 @@ const ViewShops = (() => {
             atLanding: batch.at_landing || {},
           };
         } catch (err) {
-
           forecastError = err.message;
           Env.log.warn("forecasts failed", err.code || "");
         }
@@ -6697,7 +6539,6 @@ const ViewShops = (() => {
     });
 
     const byName = (a, b) => (a.item.name || "").localeCompare(b.item.name || "");
-
     const soonest = (x, y) => {
       if (x === null && y === null) return 0;
       if (x === null) return 1;
@@ -6741,7 +6582,6 @@ const ViewShops = (() => {
     const seen = seenAt();
     const columns = data.landAt ? 7 : 8;
     let lastType;
-
     const armed = bells();
     let moved = false;
 
@@ -6763,7 +6603,6 @@ const ViewShops = (() => {
       const departAt = f && f.depart_at ? Date.parse(f.depart_at) : fallbackDepart;
       const boardTitle = departAt && cap && item.cost ? ` title="Take ${Fmt.esc(Fmt.money(cap * item.cost))}"` : "";
       const mine = data.landAt ? (data.atLanding[String(item.item_id)] || null) : null;
-
       const yours = mine
         ? `${Fmt.esc(Fmt.hitPct(mine.hit))}%`
           + (mine.wait ? '<span class="o-sub">catch chance</span>'
@@ -6990,7 +6829,6 @@ const ViewMuseum = (() => {
           name: it.name,
           type: it.type,
           sub_type: it.sub_type || null,
-
           shops: ((it.value && it.value.shops) || [])
             .filter((s) => s.country !== "Torn" || (s.buy_price !== null && s.buy_price !== undefined))
             .map((s) => ({ country: s.country, shop: s.shop })),
@@ -7219,7 +7057,6 @@ const ViewWatches = (() => {
   let adding = false;
 
   const form = { country: null, itemId: "", onRestock: true, onSoldout: false };
-
   let shelf = { code: null, items: null, error: null, loading: false };
 
   function resetForm() {
@@ -7237,11 +7074,9 @@ const ViewWatches = (() => {
     loading = true;
     error = null;
     try {
-
       await Account.load();
       let list;
       try {
-
         list = (await Oracle.board({ travel: Settings.get("travel_type") })).watches || [];
       } catch (err) {
         if (err.code !== "premium_required") throw err;
@@ -7262,7 +7097,6 @@ const ViewWatches = (() => {
 
   function render(el) {
     if (!Oracle.haveToken()) {
-
       el.innerHTML = Gate.account("get restock alerts", true);
       Gate.wire(el);
       return;
@@ -7303,11 +7137,9 @@ const ViewWatches = (() => {
 
   function existing() {
     const body = ordered(rows.list).map((w) => {
-
       const band = w.restock || {};
       const due = Date.parse(band.from || band.p50 || w.predicted_restock_at) || null;
       const until = Date.parse(band.to) || null;
-
       const seen = w.observed_at ? Date.parse(w.observed_at) : null;
       const f = w.forecast;
       const reason = w.reason;
@@ -7407,7 +7239,6 @@ const ViewWatches = (() => {
   }
 
   async function loadShelf() {
-
     if (shelf.code === form.country) return;
     shelf = { code: form.country, items: null, error: null, loading: true };
     const want = form.country;
@@ -7417,7 +7248,6 @@ const ViewWatches = (() => {
       const items = shop.items.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
       if (shelf.code !== want) return;
       shelf = { code: want, items, error: null, loading: false };
-
       if (!form.itemId && items.length) form.itemId = items[0].item_id;
     } catch (err) {
       if (shelf.code !== want) return;
@@ -7445,7 +7275,6 @@ const ViewWatches = (() => {
               on_restock: form.onRestock,
               on_soldout: form.onSoldout,
             });
-
             if (res && res.delivery === "none") Account.forget();
             adding = false;
             load(true);
@@ -7541,7 +7370,6 @@ const ViewItems = (() => {
     loading = true;
     error = null;
     result = null;
-
     Panel.refresh("items", true);
     try {
       const list = await ensureCatalogue();
@@ -7648,7 +7476,6 @@ const ViewItems = (() => {
 
     const rows = scored.map(({ s, ppm }) => {
       const qty = s.quantity || 0;
-
       const restock = Fmt.restock(stamp(s.restock_at), qty,
                                   stamp(s.observed_at));
       const flight = Data.flightMinutes(s.country, travel);
@@ -8155,7 +7982,6 @@ const ViewSettings = (() => {
   }
 
   function wire(el) {
-
     for (const input of el.querySelectorAll("input.o-money")) {
       input.addEventListener("input", () => {
         const raw = input.value;
@@ -8175,7 +8001,6 @@ const ViewSettings = (() => {
       const name = input.dataset.set;
       const r = Settings.BY_NAME[name];
       const money = input.classList.contains("o-money");
-
       if (money) {
         input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
       }
@@ -8266,7 +8091,6 @@ const ViewSettings = (() => {
       case "save-key": {
         const value = (el.querySelector('[data-secret="torn_key"]').value || "").trim();
         if (!value) return;
-
         tell("Checking the key with Torn…");
         const res = await Torn.verify(value);
         if (!res.ok) { tell(res.message, "warn"); return; }
@@ -8282,7 +8106,6 @@ const ViewSettings = (() => {
       case "save-token": {
         const raw = (el.querySelector('[data-secret="oracle_token"]').value || "").trim();
         if (!raw) return;
-
         const value = (raw.match(/orc_[A-Za-z0-9_-]{20,}/) || [])[0];
         if (!value) {
           tell(/^[A-Za-z0-9]{16}$/.test(raw)
@@ -8299,7 +8122,6 @@ const ViewSettings = (() => {
       }
       case "sign-out":
         if (!window.confirm("Sign out of Torn Oracle in this browser?")) return;
-
         await Escort.clear();
         Settings.set("oracle_token", "");
         Settings.set("oracle_token_id", 0);
@@ -8315,7 +8137,6 @@ const ViewSettings = (() => {
         try {
           const res = await Oracle.signup(Settings.get("torn_key"), evictOldest);
           evictOldest = false;
-
           Settings.set("oracle_token", res.token);
           if (res.token_id) Settings.set("oracle_token_id", res.token_id);
           tell("Account ready. Shops, forecasts and plans work now.");
@@ -8345,7 +8166,7 @@ const ViewSettings = (() => {
         try {
           await navigator.clipboard.writeText(shareText);
           tell("Settings copied.");
-        } catch (e) {
+        } catch {
           tell("Settings are in the box. Copy them from there.");
         }
         break;
@@ -8411,7 +8232,6 @@ const ViewSettings = (() => {
         tokenBusy = true;
         Panel.refresh("settings");
         try {
-
           const oldId = Settings.get("oracle_token_id");
           const res = await Oracle.tokenCreate("browser");
           Settings.set("oracle_token", res.token);
@@ -8465,16 +8285,14 @@ const ViewSettings = (() => {
         try {
           await navigator.clipboard.writeText(blob);
           tell("Copied. Paste it into a bug report.");
-        } catch (e) {
+        } catch {
           tell("The clipboard is not available. The report is in the console.", "warn");
-
           console.log(blob);
         }
         break;
       }
       case "reset":
         if (!window.confirm("Remove every setting, your key and your token from this browser?")) return;
-
         await Escort.clear();
         Trip.stop("Settings reset.");
         Alerts.reset();
@@ -8621,9 +8439,7 @@ const Assist = (() => {
 
   const BAR_ID = "oracle-assist";
   const VISIT_KEY = "assist_visit";
-
   const SETTLE_MS = 1500;
-
   const MED_FREE_MS = 10_000;
 
   let bar = null;
@@ -8653,7 +8469,7 @@ const Assist = (() => {
       }
       for (const el of body.querySelectorAll("br, p, div, li")) el.after(" ");
       return body.textContent.replace(/\s+/g, " ").trim();
-    } catch (e) {
+    } catch {
       return String(html);
     }
   }
@@ -8683,10 +8499,10 @@ const Assist = (() => {
         body: payload,
       });
       let data = null;
-      try { data = await res.json(); } catch (e) {  }
+      try { data = await res.json(); } catch {}
       const ok = res.ok && !!data && data.success !== false && !data.error;
       return { ok, data, message: textOf(data) || (ok ? "" : "Torn did not accept that.") };
-    } catch (err) {
+    } catch {
       return { ok: false, data: null, message: "Could not reach Torn." };
     }
   }
@@ -8909,7 +8725,7 @@ const Assist = (() => {
     const refs = [];
     if (names.length) {
       let catalogue;
-      try { catalogue = await itemCatalogue(); } catch (e) { notedKey = ""; return; }
+      try { catalogue = await itemCatalogue(); } catch { notedKey = ""; return; }
       for (const name of names) {
         const it = catalogue.get(name);
         if (it && it.type !== "Weapon" && it.type !== "Armor") refs.push({ id: it.id, name });
@@ -8944,7 +8760,6 @@ const Assist = (() => {
       exportOn: Settings.get("assist_export"),
       track: tracked(),
       sell: v.sell || [],
-
       fill: pick && !kitNames(kit).has(pick.name) && !skipPack.has(pick.name) ? pick : null,
       skipPack: [...skipPack],
       skipped: { hosp: v.noHosp === true, med: v.noMed === true, leave: v.leave === true,
@@ -8957,7 +8772,6 @@ const Assist = (() => {
       wallet: mode === "abroad" ? Page.shopWallet() : null,
       bought: v.bought === true,
       medOut: v.medOut === true,
-
       medFree: v.medOut === true && Date.now() - (v.medAt || 0) < MED_FREE_MS ? v.medFree : null,
       hospUsed: v.hospUsed === true,
     };
@@ -8979,7 +8793,6 @@ const Assist = (() => {
       for (const e of kit.extras || []) need.push({ ref: { id: e.id, name: e.name }, n: e.n });
       const fill = f.fill;
       if (!f.carried || (!need.length && !f.exportOn && !toSell)) return null;
-
       const t = f.target;
       if (t && f.selected !== t.code) {
         const why = t.from === "plan" ? "Suggested from your plan."
@@ -9031,31 +8844,33 @@ const Assist = (() => {
     const skipped = f.skipped || {};
     const meds = kit.med && !skipped.med ? count(kit.med) : 0;
     const hospLeft = kit.hosp && !skipped.hosp ? count(kit.hosp) : 0;
+    const extra = f.wallet.extra || 0;
     const shelves = f.track
       .filter((ref) => !(skipped.buy || []).includes(ref.name))
       .map((ref) => ({ ref, row: f.rows.find((r) => r.id === ref.id) }))
-      .filter((x) => x.row);
+      .filter((x) => x.row)
+      .map((x) => ({ ...x, room: free + (extra && x.row.type === f.wallet.extraType ? extra : 0) }));
+    const room = shelves.reduce((most, x) => Math.max(most, x.room), free);
     const stock = shelves.reduce((sum, x) => sum + x.row.stock, 0);
-
+    const extraStock = shelves.reduce((sum, x) => sum + (x.room > free ? x.row.stock : 0), 0);
     const names = (shelves.length ? shelves.map((x) => x.ref) : f.track).map((r) => r.name).join(", ");
-
     const want = free + toSell + (f.hospital && meds ? 1 : 0);
-
     const sale = () => {
       const { ref, n } = selling[0];
       return { act: "sell", ref, ready, skip: "sell", label: "Sell " + n + " " + ref.name };
     };
-    const ready = want > 0 && shelves.length > 0 && stock >= want;
+    const ready = shelves.length > 0 && (want > 0
+      ? stock - Math.min(extraStock, room - free) >= want
+      : room > free && extraStock >= room - free);
     const watching = names ? "Watching " + names : "Pick items to watch on the Assist tab";
 
     const buy = () => {
       for (const x of shelves) {
         if (x.row.stock <= 0 || !x.row.price) continue;
         const afford = Math.floor(f.wallet.money / x.row.price);
-        const amount = Math.min(x.row.stock, free, afford);
+        const amount = Math.min(x.row.stock, x.room, afford);
         if (amount > 0) {
-
-          const note = amount === free ? ""
+          const note = amount === x.room ? ""
             : afford < x.row.stock ? "Your cash covers " + amount + "."
                                    : "Only " + amount + " in stock.";
           return { act: "buy", ref: x.ref, amount, price: x.row.price, ready, skip: "buy", note,
@@ -9066,12 +8881,11 @@ const Assist = (() => {
     };
 
     if (f.hospital) {
-      if (!ready) return { label: watching, note: want + " slots to fill.", ready, watch: true };
+      if (!ready) return { label: watching, note: want + room - free + " slots to fill.", ready, watch: true };
       if (meds > 0) {
         return { act: "use", ref: kit.med, ready, skip: "med",
                  label: "Med out (" + meds + " left)", note: "Restocked: " + stock + " in stock." };
       }
-
       if (toSell) return Object.assign(sale(), { note: "Works once you are out of hospital." });
       const step = buy();
       if (step) {
@@ -9082,9 +8896,8 @@ const Assist = (() => {
 
     if (toSell) return sale();
 
-    if (free === 0 && f.medOut && !f.bought) return { label: "Your bag is full", ready };
-
-    if (free === 0 && !(hospLeft && meds)) {
+    if (room === 0 && f.medOut && !f.bought) return { label: "Your bag is full", ready };
+    if (room === 0 && !(hospLeft && meds)) {
       return { act: "fly", label: "Fly home", note: "Your bag is full.", ready };
     }
 
@@ -9099,9 +8912,9 @@ const Assist = (() => {
                label: "Self-hosp", note: "Waits in hospital, safe from muggers." };
     }
     if (f.bought || skipped.leave) {
-      return { act: "fly", label: "Fly home", note: free + " slots still free.", ready };
+      return { act: "fly", label: "Fly home", note: room + " slots still free.", ready };
     }
-    return { label: watching, note: free + " slots to fill.", ready, watch: true, skip: "wait" };
+    return { label: watching, note: room + " slots to fill.", ready, watch: true, skip: "wait" };
   }
 
   function pageKey() {
@@ -9121,7 +8934,6 @@ const Assist = (() => {
     const before = facts();
     const step = decide(before);
     if (!step || !step.act) return;
-
     if (step.act === "select") {
       Page.preselect(step.code, false);
       message = null;
@@ -9136,7 +8948,6 @@ const Assist = (() => {
     const kit = Settings.get("assist_kit");
     const med = step.act === "use" && !!kit.med && step.ref.id === kit.med.id;
     if (step.act === "fill" && res.refused) skipPack.add(step.ref.name);
-
     if (step.act === "sell" && (res.ok || (res.refused && !inHospital()))) {
       markVisit({ sell: (visit().sell || []).filter((r) => r.id !== step.ref.id) });
     }
@@ -9149,7 +8960,6 @@ const Assist = (() => {
     if (res.ok) {
       if (step.act === "buy") markVisit({ bought: true });
       if (step.act === "use" && Page.mode() === "flight") markVisit({ hospUsed: true });
-
       if (step.act === "use") markVisit({ medOut: med });
       if (med && before.wallet) {
         markVisit({ medAt: Date.now(),
@@ -9157,13 +8967,11 @@ const Assist = (() => {
       }
       settle = { until: Date.now() + SETTLE_MS, key: pageKey() };
       setTimeout(paint, SETTLE_MS + 50);
-      try { window.dispatchEvent(new Event("focus")); } catch (e) {  }
+      try { window.dispatchEvent(new Event("focus")); } catch {}
       if (step.act === "use") Tracker.poke();
-
       if (step.act === "fly") setTimeout(() => window.location.reload(), 400);
     } else if (step.act === "buy" && visit().medOut && kit.med
                && (facts().carried || []).includes(kit.med.name)) {
-
       markVisit({ medOut: false });
     }
     message = res.message ? { text: res.message, tone: res.ok ? "" : "warn", link: res.link || "" } : null;
@@ -9212,7 +9020,7 @@ const Assist = (() => {
         osc.stop(ctx.currentTime + i * 0.22 + 0.16);
       });
       setTimeout(() => ctx.close(), tone.notes.length * 220 + 500);
-    } catch (e) {  }
+    } catch {}
   }
 
   function noticeReady(step) {
@@ -9230,7 +9038,7 @@ const Assist = (() => {
   }
 
   function focused() {
-    try { return Env.visible() && document.hasFocus(); } catch (e) { return Env.visible(); }
+    try { return Env.visible() && document.hasFocus(); } catch { return Env.visible(); }
   }
 
   function build() {
@@ -9252,9 +9060,7 @@ const Assist = (() => {
   function paint() {
     if (!bar) return;
     const mode = Page.mode();
-
     const v = visit();
-
     if (mode === "agency" && Object.keys(v).some((k) => k !== "sell")) {
       Env.write(VISIT_KEY, v.sell ? { sell: v.sell } : {});
     }
@@ -9344,7 +9150,6 @@ const Assist = (() => {
   function mount() {
     const first = !bar;
     if (first) build();
-
     if (first && Page.mode() === "abroad" && Page.hospitalLayout() && visit().medOut) {
       markVisit({ medOut: false });
     }
@@ -9385,7 +9190,7 @@ const Assist = (() => {
     const others = items.filter((name) => !extras.has(name) && !used.has(name));
     if (!others.length) return kept;
     let types;
-    try { types = await itemCatalogue(); } catch (e) { return null; }
+    try { types = await itemCatalogue(); } catch { return null; }
     for (const name of others) {
       const type = (types.get(name) || {}).type;
       if (type === "Weapon" || type === "Armor") kept += 1;
@@ -9722,7 +9527,6 @@ const ViewNews = (() => {
     let html = "", steps = "";
     const STEP = /^\s*\d+[.)]\s+([\s\S]*)$/;
     for (const para of String(text).split(/\n{2,}/)) {
-
       const lines = para.split("\n");
       const parts = lines.length > 1 && lines.every((l) => STEP.test(l)) ? lines : [para];
       const step = STEP.exec(parts[0]);
@@ -9775,7 +9579,7 @@ const StockShare = (() => {
   let liveKey = "";
 
   function focused() {
-    try { return Env.visible() && document.hasFocus(); } catch (e) { return false; }
+    try { return Env.visible() && document.hasFocus(); } catch { return false; }
   }
 
   function shopCountry() {
@@ -10389,10 +10193,8 @@ Env.ready().then(function boot() {
   let readForm = () => {};
   Page.watch((next) => { applyMode(next); placePanel(); readForm(); });
   Page.followLink();
-
   new MutationObserver(() => { Panel.applyTheme(); Assist.paint(); })
     .observe(document.body, { attributes: true, attributeFilter: ["class"] });
-
   window.addEventListener("hashchange", Page.followLink);
 
   Page.onTravelPress((code) => {
@@ -10413,7 +10215,6 @@ Env.ready().then(function boot() {
       Panel.refresh();
     }
     if (name === "inventory") {
-
       const read = ++inventoryReads;
       Assist.keptPacked(value.items).then((kept) => {
         if (kept === null || read !== inventoryReads) return;
@@ -10434,7 +10235,6 @@ Env.ready().then(function boot() {
       });
     }
     if (name === "destination") {
-
       ViewShops.follow(value);
       Panel.refresh("shops");
       Assist.paint();
@@ -10442,7 +10242,6 @@ Env.ready().then(function boot() {
   });
 
   Tracker.onEvents((result) => {
-
     try { Alerts.onTracked(result); } catch (e) { Env.log.error("alerts failed", e); }
     Assist.onObservation(result.observation);
 
@@ -10453,7 +10252,6 @@ Env.ready().then(function boot() {
       if (ev.kind === "home") {
         Plan.replanTail("a run finished");
       } else if (ev.kind === "departed" && ev.offPlan) {
-
         Env.log.info("Off-plan flight noted. Re-plan happens when you are home.");
       }
     }
@@ -10466,13 +10264,11 @@ Env.ready().then(function boot() {
   Bus.on("shop:live", () => Panel.refresh("shops"));
   Bus.on("plan:start", () => Panel.flash(null, null, "plan"));
   Bus.on("plan:stage", () => Panel.refresh("plan"));
-
   Bus.on("plan:done", (res) => {
     PlanSync.changed();
     Panel.flash(res && res.ok === false ? res.message : null, "warn", "plan");
     Panel.paintHead(); Panel.refresh(); Panel.badges(); Assist.paint();
   });
-
   Bus.on("plan:synced", (kind) => {
     if (kind === "new") Alerts.forgetOtherPlans();
     else if (kind === "reshaped") Alerts.forgetFrom(Trip.get().preserved);
@@ -10490,15 +10286,12 @@ Env.ready().then(function boot() {
   Settings.onChange((name) => {
     SettingsSync.changed(name);
     if (name === "restock_sound") Assist.beep();
-
     if (name === "oracle_token") Escort.forget();
-
     if (name === "escort_on" || name === "post_plan" || name === "oracle_token") {
       Escort.sync({ pressed: true });
     }
     if (name === "torn_key") Tracker.poke();
     if (name === "clock_24h" || name === "minimal") Panel.applyTheme();
-
     if (name === "oracle_token") {
       Account.forget();
       Account.load(true);
@@ -10537,7 +10330,6 @@ Env.ready().then(function boot() {
       PlanSync.pull();
       Panel.applyTheme();
       Panel.refresh();
-
       Panel.fetchData(false);
     }
   });
