@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.13-fork
+// @version      2.6.14-fork
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.13 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (bazaar, ville), alerte d'export sur toutes les pages.
+// @description  Fork de Torn Oracle: Travel 2.6.14 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (bazaar, ville), alerte d'export sur toutes les pages.
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -770,7 +770,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.13";
+  const SCRIPT_VERSION = "2.6.14";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -8333,13 +8333,13 @@ const ViewSettings = (() => {
 const ViewExports = (() => {
   "use strict";
 
-  const ROW_CAP = 14;
+  const FOLD_KEY = "export_folded";
 
   let data = null;
   let loading = false;
   let error = null;
-  let expanded = false;
   let failedAt = 0;
+  const folded = new Set(Env.read(FOLD_KEY, []));
 
   async function load(force) {
     if (!Oracle.haveToken() || loading) return;
@@ -8361,15 +8361,10 @@ const ViewExports = (() => {
     }
   }
 
-  function fillable() {
-    const cap = Settings.get("capacity");
-    return data ? data.rows.filter((r) => r.listed >= cap) : [];
-  }
-
   function bestFor(country) {
     load();
     if (!data) return null;
-    const row = fillable().find((r) => r.country === country);
+    const row = data.rows.find((r) => r.country === country && !market(r));
     if (!row) return null;
     const units = Settings.get("capacity");
     return { id: row.item_id, name: row.name, units, profit: row.margin * units };
@@ -8381,6 +8376,29 @@ const ViewExports = (() => {
     return i >= 0 && s.active ? s.legs[i].country : null;
   }
 
+  function byCountry(rows, next) {
+    const groups = new Map();
+    for (const r of rows) {
+      if (!groups.has(r.country)) groups.set(r.country, []);
+      groups.get(r.country).push(r);
+    }
+    return [...groups.entries()].sort(([a, x], [b, y]) =>
+      (b === next) - (a === next) || y[0].margin - x[0].margin);
+  }
+
+  const market = (r) => r.cost_source === "market";
+
+  function countryHead(code, rows, cap) {
+    const open = !folded.has(code);
+    return `<tr class="o-cat${open ? "" : " is-folded"}"><td colspan="4">
+      <button type="button" class="o-cat-btn" data-act="fold" data-country="${Fmt.esc(code)}"
+        aria-expanded="${open}">
+        <span class="o-cat-name">${Flags.place(code)}</span>
+        <span class="o-cat-count">${Fmt.esc(Fmt.plural(rows.length, "export"))} · best
+          +${Fmt.esc(Fmt.money(rows[0].margin * cap))}</span>
+      </button></td></tr>`;
+  }
+
   function render(el) {
     if (!Oracle.haveToken()) {
       el.innerHTML = Gate.account("see what foreign shops pay");
@@ -8390,7 +8408,7 @@ const ViewExports = (() => {
     if (loading && !data) { el.innerHTML = `<div class="o-empty">Reading the shops…</div>`; return; }
     if (error) { el.innerHTML = `<div class="o-note is-warn">${Fmt.esc(error)}</div>`; return; }
     if (!data) { el.innerHTML = `<div class="o-empty">Nothing loaded yet.</div>`; load(); return; }
-    const rows = fillable();
+    const rows = data.rows;
     if (!rows.length) {
       el.innerHTML = `<div class="o-empty">No foreign shop pays more than bazaars charge in Torn right now.</div>`;
       return;
@@ -8404,27 +8422,31 @@ const ViewExports = (() => {
              <span class="go">+${Fmt.esc(Fmt.money(best.margin * cap))}</span>.`
           : "no export pays there."}</div>`
       : "";
-    const shown = expanded ? rows : rows.slice(0, ROW_CAP);
-    const body = shown.map((r) => `<tr${r.country === next ? ' class="leg-live"' : ""}>
-        <td>${Fmt.esc(r.name)}<span class="o-sub">${Flags.place(r.country)}</span></td>
-        <td class="num">${Fmt.esc(Fmt.price(r.pays))}<span class="o-sub">bazaars ${Fmt.esc(Fmt.price(r.cost))}</span></td>
+    const body = byCountry(rows, next).map(([code, group]) => countryHead(code, group, cap)
+      + (folded.has(code) ? "" : group.map((r) => `<tr${code === next ? ' class="leg-live"' : ""}>
+        <td>${Fmt.esc(r.name)}</td>
+        <td class="num">${Fmt.esc(Fmt.price(r.pays))}<span class="o-sub">${market(r) ? "market" : "bazaars"} ${Fmt.esc(Fmt.price(r.cost))}</span></td>
         <td class="num"><span class="go">+${Fmt.esc(Fmt.price(r.margin))}</span>
           <span class="o-sub">${Fmt.esc(Fmt.money(r.margin * cap))} for ${Fmt.esc(Fmt.count(cap))}</span></td>
-        <td class="num">${Fmt.esc(Fmt.count(r.listed))}</td>
-      </tr>`).join("");
-    const more = rows.length > ROW_CAP
-      ? `<button type="button" class="o-btn" data-act="expand">${expanded ? "Fewer" : "All " + rows.length}</button>`
+        <td class="num">${market(r) ? "-" : Fmt.esc(Fmt.count(r.listed))}</td>
+      </tr>`).join(""))).join("");
+    const fallback = rows.some(market)
+      ? `<div class="o-note is-warn">Bazaars cannot be read right now. Items without bazaar prices use Torn's market value.</div>`
       : "";
-    el.innerHTML = `${head}<div class="o-scroll"><table>
+    el.innerHTML = `${fallback}${head}<div class="o-scroll"><table>
         <thead><tr><th>Item</th><th class="num">Shop pays</th><th class="num">Profit</th>
-          <th class="num" title="Units in bazaars under the shop price">Listed</th></tr></thead>
+          <th class="num" title="Units under the shop price in the 25 cheapest bazaar listings">Listed</th></tr></thead>
         <tbody>${body}</tbody></table></div>
-      <div class="o-acts">${more}</div>
       <div class="o-note">Buy from bazaars in Torn and sell to the shop abroad. Bazaar price is the
-        average of the 5 cheapest listings. Items with too few listings under the shop price to fill
-        your suitcase are not shown.</div>`;
-    const expand = el.querySelector('[data-act="expand"]');
-    if (expand) expand.addEventListener("click", () => { expanded = !expanded; Panel.refresh("exports"); });
+        average of the 5 cheapest listings.</div>`;
+    for (const btn of el.querySelectorAll('[data-act="fold"]')) {
+      btn.addEventListener("click", () => {
+        const code = btn.dataset.country;
+        if (!folded.delete(code)) folded.add(code);
+        Env.write(FOLD_KEY, [...folded]);
+        Panel.refresh("exports");
+      });
+    }
   }
 
   return {
