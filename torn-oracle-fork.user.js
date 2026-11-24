@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.14-fork
+// @version      2.6.15-fork
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.14 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (bazaar, ville), alerte d'export sur toutes les pages.
+// @description  Fork de Torn Oracle: Travel 2.6.15 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (bazaar, ville), alerte d'export sur toutes les pages.
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -770,7 +770,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.14";
+  const SCRIPT_VERSION = "2.6.15";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -8364,7 +8364,7 @@ const ViewExports = (() => {
   function bestFor(country) {
     load();
     if (!data) return null;
-    const row = data.rows.find((r) => r.country === country && !market(r));
+    const row = data.rows.find((r) => r.country === country);
     if (!row) return null;
     const units = Settings.get("capacity");
     return { id: row.item_id, name: row.name, units, profit: row.margin * units };
