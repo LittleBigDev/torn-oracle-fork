@@ -25,6 +25,8 @@ Travel agency, **Open bazaar** button left of TRAVEL: shown only when you own a 
 
 **Assist** tab, **Fill** button: when an item still to pack needs at least as many units as you have free slots, the button becomes "Fill <item> (N slots)" and fills every free slot in one click, with the same single request as Torn's own FILL button. Only for items taken from your own inventory: Torn's FILL can't take from the faction armoury.
 
+**Plan** tab, **change** / **Record** window: when you landed somewhere other than planned, the planned item is counted at the price seen on that country's shelf, not at the plan's price (Torn Oracle kept the plan's price, so the profit was wrong).
+
 ## Tracked items
 
 Torn Oracle's own **Track the best items** box (Assist tab) ranks items with the fork's margin (best channel above). With a self-hosp item set and a plan step to that country, only the plan's item is tracked: otherwise another item's restock would trigger the med-out and Assist would offer to buy that other item. A warning appears under **Tracked items** when your cash can't buy a full bag of a tracked item (`cash_warning.js`).
@@ -73,6 +75,8 @@ Onglet **Assist**, à l'arrivée sans self-hosp (pour vendre d'abord tes exports
 Agence de voyage, bouton **Open bazaar** à gauche de TRAVEL : affiché seulement si tu as un bazaar avec des objets et qu'il est fermé (lu sur la page du bazaar de Torn). Un clic l'ouvre, avec la même requête unique que le bouton de Torn. Code : `bazaar_open.js`, injecté dans le fork à la génération.
 
 Onglet **Assist**, bouton **Fill** : quand il reste à ranger au moins autant d'unités d'un objet que de places libres, le bouton devient « Fill <objet> (N slots) » et remplit toutes les places en un clic, avec la même requête unique que le bouton FILL de Torn. Seulement pour un objet pris dans ton inventaire : le FILL de Torn ne prend pas dans l'armurerie de faction.
+
+Onglet **Plan**, fenêtre **change** / **Record** : quand tu as atterri ailleurs que prévu, l'objet prévu est compté au prix relevé dans le rayon de ce pays, pas au prix du plan (Torn Oracle gardait le prix du plan, d'où un profit faux).
 
 ### Tracked items
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.16-fork
+// @version      2.6.16-fork.1
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.16 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (bazaar, ville), alerte d'export sur toutes les pages.
@@ -2445,6 +2445,10 @@ const Trip = (() => {
       if (hit) rt.item = Object.assign(hit, { swappedFrom: leg.item_name });
     } else if (wanted !== null) {
       rt.item = null;
+    }
+    if (!rt.item && (rt.paidCost === null || rt.paidCost === undefined)) {
+      const hit = priced(rt, leg.item_id, answer && answer.item);
+      if (hit) rt.paidCost = hit.cost;
     }
 
     rt.extra = [];
