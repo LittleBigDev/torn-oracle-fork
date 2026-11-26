@@ -15,13 +15,15 @@ Torn Oracle's **Sell to** setting still applies: keep it on **Best price** (the 
 
 ## Assist and travel agency
 
-**Assist** tab: when the self-hosp or a med-out item can't be packed because none is left in your inventory, the error message links to that item on the item market.
+**Assist** tab: when a trip kit item can't be packed because you have none left (in your inventory or your faction's armoury), the error message links to that item on the item market.
+
+**Assist** tab, **Trip kit** section: the box "When you have none, take kit items from your faction's armoury" (unchecked by default; Torn Oracle itself falls back on it) lets you allow the armoury. Unchecked, kit items are only taken from your own inventory: when you have none, Assist says so and links to the item market.
 
 **Assist** tab, after landing without a self-hosp (to sell your exports first): when your trip kit has med-out items, Assist offers the self-hosp before buying, even if the shop is already restocked. The self-hosp and med-out items free their slots, so you buy a full bag. During the flight, the Self-hosp button is hidden while exports are waiting to be sold: Assist shows "Sell on landing" instead.
 
 Travel agency, **Open bazaar** button left of TRAVEL: shown only when you own a bazaar that has items in it but is closed (read from Torn's bazaar page). One click opens it, with the same single request as Torn's own button. Code: `bazaar_open.js`, injected into the fork at build time.
 
-**Assist** tab, **Fill** button: when an item still to pack needs at least as many units as you have free slots, the button becomes "Fill <item> (N slots)" and fills every free slot in one click, with the same single request as Torn's own FILL button.
+**Assist** tab, **Fill** button: when an item still to pack needs at least as many units as you have free slots, the button becomes "Fill <item> (N slots)" and fills every free slot in one click, with the same single request as Torn's own FILL button. Only for items taken from your own inventory: Torn's FILL can't take from the faction armoury.
 
 ## Tracked items
 
@@ -62,13 +64,15 @@ Onglet **Export watch** : un objet, un pays, une marge minimale par unité. Tout
 
 ### Assist et agence de voyage
 
-Onglet **Assist** : quand l'objet de self-hosp ou de med-out ne peut pas être rangé dans la valise faute d'en avoir dans l'inventaire, le message d'erreur donne le lien vers cet objet sur l'item market.
+Onglet **Assist** : quand un objet du kit de voyage ne peut pas être rangé dans la valise faute d'en avoir (inventaire ou armurerie de faction), le message d'erreur donne le lien vers cet objet sur l'item market.
+
+Onglet **Assist**, section **Trip kit** : la case « When you have none, take kit items from your faction's armoury » (décochée par défaut ; Torn Oracle, lui, s'y rabat) permet d'autoriser l'armurerie. Décochée, le kit ne se prend que dans ton inventaire : s'il en manque, Assist le dit et donne le lien vers l'item market.
 
 Onglet **Assist**, à l'arrivée sans self-hosp (pour vendre d'abord tes exports) : si ton kit a des objets de med-out, Assist propose le self-hosp avant l'achat, même si la boutique est déjà restockée. Self-hosp et med-out libèrent leurs places : tu achètes un sac plein. Pendant le vol, le bouton Self-hosp est masqué tant que des exports attendent d'être vendus : Assist affiche « Sell on landing » à la place.
 
 Agence de voyage, bouton **Open bazaar** à gauche de TRAVEL : affiché seulement si tu as un bazaar avec des objets et qu'il est fermé (lu sur la page du bazaar de Torn). Un clic l'ouvre, avec la même requête unique que le bouton de Torn. Code : `bazaar_open.js`, injecté dans le fork à la génération.
 
-Onglet **Assist**, bouton **Fill** : quand il reste à ranger au moins autant d'unités d'un objet que de places libres, le bouton devient « Fill <objet> (N slots) » et remplit toutes les places en un clic, avec la même requête unique que le bouton FILL de Torn.
+Onglet **Assist**, bouton **Fill** : quand il reste à ranger au moins autant d'unités d'un objet que de places libres, le bouton devient « Fill <objet> (N slots) » et remplit toutes les places en un clic, avec la même requête unique que le bouton FILL de Torn. Seulement pour un objet pris dans ton inventaire : le FILL de Torn ne prend pas dans l'armurerie de faction.
 
 ### Tracked items
 

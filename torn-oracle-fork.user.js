@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.15-fork
+// @version      2.6.16-fork
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
-// @description  Fork de Torn Oracle: Travel 2.6.15 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (bazaar, ville), alerte d'export sur toutes les pages.
+// @description  Fork de Torn Oracle: Travel 2.6.16 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (bazaar, ville), alerte d'export sur toutes les pages.
 // @author       Ruinbringer
 // @license      GPL-3.0-only
 // @supportURL   https://discord.gg/uCkYscEJzr
@@ -15,6 +15,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM_notification
 // @grant        GM_addStyle
+// @grant        unsafeWindow
 // @connect      api.torn.com
 // @connect      torn-oracle.duckdns.org
 // @connect      weav3r.dev
@@ -357,13 +358,13 @@ const Settings = (() => {
       help: "Items you carry per flight." },
     { name: "capacity_from_page", group: "trips", kind: "bool", def: true, hidden: true,
       label: "Automatic" },
-    { name: "extra_slots", group: "trips", kind: "int", def: 0, min: 0, max: 50,
+    { name: "extra_slots", group: "trips", kind: "int", def: 0, min: 0, max: 50, sync: "extra_slots",
       auto: "extra_slots_from_page",
       label: "Company extra slots",
       help: "Slots your job adds for flowers or plushies only." },
     { name: "extra_slots_from_page", group: "trips", kind: "bool", def: true, hidden: true,
       label: "Automatic" },
-    { name: "extra_type", group: "trips", kind: "choice", def: "Flower",
+    { name: "extra_type", group: "trips", kind: "choice", def: "Flower", sync: "extra_type",
       choices: () => [["Flower", "Flowers"], ["Plushie", "Plushies"]],
       showIf: () => Settings.get("extra_slots") > 0,
       label: "Extra slots hold" },
@@ -394,7 +395,7 @@ const Settings = (() => {
       sync: "item_types",
       label: "Item categories",
       help: "None selected means every category." },
-    { name: "plan_items", group: "buying", kind: "picks", def: {},
+    { name: "plan_items", group: "buying", kind: "picks", def: {}, sync: "plan_items",
       label: "Items",
       help: "Pick items in a category to plan only those. A category with none picked plans all its items." },
     { name: "exclude_types", group: "buying", kind: "types", def: [], hidden: true,
@@ -448,14 +449,16 @@ const Settings = (() => {
     { name: "assist_kit", group: "assist", kind: "kit", hidden: true, sync: "assist_kit",
       def: { hosp: null, hosps: 1, med: null, meds: 0, extras: [] },
       label: "Trip kit" },
+    { name: "fork_kit_faction", group: "assist", kind: "bool", def: false, hidden: true,
+      label: "Take kit items from the faction armoury" },
     { name: "assist_track", group: "assist", kind: "itemrefs", def: [], hidden: true,
       sync: "assist_track", label: "Tracked items" },
     { name: "assist_auto_track", group: "assist", kind: "bool", def: false, hidden: true,
-      label: "Track the best items" },
+      sync: "assist_auto_track", label: "Track the best items" },
     { name: "assist_best_n", group: "assist", kind: "int", def: 2, min: 1, max: 10, hidden: true,
-      label: "How many best items" },
+      sync: "assist_best_n", label: "How many best items" },
     { name: "assist_export", group: "assist", kind: "bool", def: false, hidden: true,
-      label: "Pack the best export" },
+      sync: "assist_export", label: "Pack the best export" },
 
     { name: "collapsed", group: "display", kind: "bool", def: false, hidden: true,
       label: "Panel collapsed" },
@@ -661,7 +664,10 @@ const Settings = (() => {
   }
 
   const SHARED_GROUPS = ["trips", "buying", "forecast"];
-  const shareable = () => SCHEMA.filter((r) => SHARED_GROUPS.includes(r.group) && !r.hidden);
+  const OWN = ["travel_type", "capacity", "extra_slots", "extra_type"];
+  const planRows = () => SCHEMA.filter((r) => SHARED_GROUPS.includes(r.group) && !r.hidden);
+  const assistRows = () => SCHEMA.filter((r) => r.group === "assist");
+  const shareable = () => [...planRows().filter((r) => !OWN.includes(r.name)), ...assistRows()];
   const SHARE_MARK = "torn_oracle_travel";
 
   function exportShared() {
@@ -686,7 +692,7 @@ const Settings = (() => {
   const PRESETS_KEY = "presets";
   const MAX_PRESETS = 12;
   const MAX_PRESET_NAME = 32;
-  const presetRows = () => [...shareable(), ...SCHEMA.filter((r) => r.group === "assist")];
+  const presetRows = () => [...planRows(), ...assistRows()];
   // Fork : preset en place et comparaison avec les réglages actuels
   const CURRENT_PRESET_KEY = "fork_preset_current";
   const currentPreset = () => Env.read(CURRENT_PRESET_KEY, "") || "";
@@ -701,9 +707,28 @@ const Settings = (() => {
     return live && typeof live === "object" && !Array.isArray(live) ? live : {};
   }
 
-  function writePresets(all) {
+  function storePresets(all) {
     Env.write(PRESETS_KEY, all);
     Env.keep(PRESETS_KEY, all);
+  }
+
+  function writePresets(all) {
+    storePresets(all);
+    listeners.forEach((fn) => { try { fn("presets", all); } catch (e) { Env.log.warn("settings listener", e); } });
+  }
+
+  function applyPresets(remote) {
+    if (!remote || typeof remote !== "object" || Array.isArray(remote)) return false;
+    const clean = {};
+    for (const [name, blob] of Object.entries(remote)) {
+      const key = String(name).trim().slice(0, MAX_PRESET_NAME);
+      if (!key || !blob || typeof blob !== "object" || Array.isArray(blob)) continue;
+      if (Object.keys(clean).length >= MAX_PRESETS) break;
+      clean[key] = blob;
+    }
+    if (JSON.stringify(clean) === JSON.stringify(presets())) return false;
+    storePresets(clean);
+    return true;
   }
 
   function savePreset(name) {
@@ -759,7 +784,8 @@ const Settings = (() => {
     SCHEMA, BY_NAME, VERSION, MAX_MEDS, MAX_TRACKED, MAX_EXTRAS, MAX_EXTRA_COUNT,
     load, all, get, set, apply, sync, onChange, exportSafe, exportShared, importShared,
     planCountries, aimAtRestock,
-    MAX_PRESETS, MAX_PRESET_NAME, presets, savePreset, loadPreset, renamePreset, deletePreset, currentPreset, presetMatches,
+    MAX_PRESETS, MAX_PRESET_NAME, presets, applyPresets, savePreset, loadPreset, renamePreset, currentPreset, presetMatches,
+    deletePreset,
     groups: () => ["account", "trips", "buying", "forecast", "alerts", "stock", "display"],
   };
 })();
@@ -770,7 +796,7 @@ const Oracle = (() => {
   const HOST = "https://torn-oracle.duckdns.org";
   const PREFIX = "/api/v1";
 
-  const SCRIPT_VERSION = "2.6.15";
+  const SCRIPT_VERSION = "2.6.16";
 
   let backoffUntil = 0;
   let consecutiveFailures = 0;
@@ -1166,6 +1192,9 @@ const SettingsSync = (() => {
   const PUSH_DELAY_MS = 800;
 
   const pending = new Set();
+  const SEEDED = new Set(["assist_kit", "assist_track", "assist_auto_track", "assist_best_n",
+                          "assist_export", "plan_items", "extra_slots", "extra_type"]);
+  let presetsPending = false;
   let pulledAt = 0;
   let pulling = false;
   let pushTimer = null;
@@ -1194,21 +1223,27 @@ const SettingsSync = (() => {
 
   async function push() {
     clearTimeout(pushTimer);
-    if (!known || !Oracle.haveToken() || !pending.size) return;
+    if (!known || !Oracle.haveToken() || (!pending.size && !presetsPending)) return;
     const names = [...pending];
+    const withPresets = presetsPending;
     pending.clear();
+    presetsPending = false;
     const body = {};
     for (const name of names) {
       const row = Settings.BY_NAME[name];
       body[row.sync] = toWire(row, Settings.get(name));
     }
+    if (withPresets) body.presets = Settings.presets();
     try {
       await Oracle.settingsSave(body);
       pulledAt = Date.now();
       lastError = null;
     } catch (err) {
       const refused = err.status >= 400 && err.status < 500 && err.status !== 429;
-      if (!refused) names.forEach((n) => pending.add(n));
+      if (!refused) {
+        names.forEach((n) => pending.add(n));
+        presetsPending = presetsPending || withPresets;
+      }
       lastError = err.message;
       Env.log.warn("settings save failed", err.message);
     }
@@ -1220,20 +1255,22 @@ const SettingsSync = (() => {
     if (!force && Date.now() - pulledAt < PULL_MS) return;
     pulling = true;
     try {
-      if (known && pending.size) await push();
+      if (known && (pending.size || presetsPending)) await push();
       const remote = await Oracle.settingsGet();
       pulledAt = Date.now();
       lastError = null;
       known = true;
+      const havePresets = Object.keys(Settings.presets()).length > 0;
       if (!remote.saved) {
         rows().forEach((r) => pending.add(r.name));
+        presetsPending = havePresets;
         await push();
         return;
       }
       const changes = {};
       for (const row of rows()) {
         if (pending.has(row.name)) continue;
-        if (row.group === "assist" && remote[row.sync] === null
+        if (SEEDED.has(row.name) && remote[row.sync] === null
             && JSON.stringify(Settings.get(row.name)) !== JSON.stringify(row.def)) {
           pending.add(row.name);
           continue;
@@ -1241,8 +1278,15 @@ const SettingsSync = (() => {
         const v = fromWire(row, remote[row.sync]);
         if (v !== undefined) changes[row.name] = v;
       }
-      Settings.apply(changes);
-      if (pending.size) await push();
+      const moved = Settings.apply(changes);
+      if (!presetsPending) {
+        if (remote.presets === null || remote.presets === undefined) {
+          presetsPending = havePresets && remote.presets === null;
+        } else if (Settings.applyPresets(remote.presets) && !moved.length) {
+          Bus.emit("settings:remote", ["presets"]);
+        }
+      }
+      if (pending.size || presetsPending) await push();
     } catch (err) {
       lastError = err.message;
       Env.log.warn("settings sync failed", err.message);
@@ -1254,14 +1298,16 @@ const SettingsSync = (() => {
 
   function changed(name) {
     const row = Settings.BY_NAME[name];
-    if (!row || !row.sync) return;
-    pending.add(name);
+    if (name === "presets") presetsPending = true;
+    else if (!row || !row.sync) return;
+    else pending.add(name);
     clearTimeout(pushTimer);
     pushTimer = setTimeout(push, PUSH_DELAY_MS);
   }
 
   function forget() {
     pending.clear();
+    presetsPending = false;
     pulledAt = 0;
     lastError = null;
     known = false;
@@ -1272,7 +1318,7 @@ const SettingsSync = (() => {
   }
 
   function state() {
-    return { lastError, pulledAt, pending: pending.size };
+    return { lastError, pulledAt, pending: pending.size + (presetsPending ? 1 : 0) };
   }
 
   return { pull, push, changed, forget, returned, state };
@@ -2878,7 +2924,10 @@ const Alerts = (() => {
     const code = options && options.code;
     Env.toast(title, body, () => {
       try { window.focus(); } catch {}
-      if (code) Page.preselect(code);
+      if (code) {
+        Page.suggest(code, "alert");
+        Assist.paint();
+      }
     });
     Bus.emit("alert", { kind, legIndex, title, body, at: Date.now() });
     Env.log.event("alert: " + title + " — " + body);
@@ -3346,10 +3395,12 @@ function plannerCore() {
     return idleMs >= MIN_FILL_GAP_MS + FILL_SLACK_MS ? idleMs : 0;
   }
 
-  function specFromLanding(prep, t, cfg, cash, kind, land, win, oneway, shelf) {
+  function specFromLanding(prep, t, cfg, cash, kind, land, oneway, shelf) {
     let depart = land - prep.flightMs;
     if (depart < t) { depart = t; land = t + prep.flightMs; }
-    const homeAgain = land + prep.flightMs;
+    const win = windowAt(prep, land);
+    if (!win) return null;
+    const homeAgain = (win.wait ? win.end : land) + prep.flightMs;
     if ((oneway ? land : homeAgain) > cfg.endTime) return null;
 
     const doseClear = doseClearAt(cfg);
@@ -3358,8 +3409,6 @@ function plannerCore() {
       return null;
     }
 
-    win = win || windowAt(prep, land);
-    if (!win) return null;
     const s = sampleAt(win, land);
     if (!s) return null;
 
@@ -3389,16 +3438,15 @@ function plannerCore() {
     const idle = Math.max(0, depart - t);
     const rate = profit / Math.max(1, (spanEnd - t - recoverableWait(idle)) / 1000);
 
-    const w = windowAt(prep, land);
-    const target = (kind === "restock" && w && w.start > cfg.seenAt
-                    && depart <= w.start && w.start <= land)
-      ? w.start : null;
+    const target = (kind === "restock" && win.start > cfg.seenAt
+                    && depart <= win.start && win.start <= land)
+      ? win.start : null;
 
     return {
       rate, profit, prep, kind, depart, land, homeAgain,
       restock: target, idle, units, oneway,
-      landBy: w ? w.end : null,
-      latestDepart: w ? w.end - prep.flightMs : null,
+      landBy: win.end,
+      latestDepart: win.end - prep.flightMs,
       hit,
       shelf: s.shelf,
     };
@@ -3418,8 +3466,7 @@ function plannerCore() {
         if (seen.has(land)) continue;
         seen.add(land);
         if (prep.selloutAt !== null && prep.selloutAt <= land) continue;
-        const spec = specFromLanding(prep, t, cfg, cash, kind, land,
-                                     windowAt(prep, land), oneway, shelf);
+        const spec = specFromLanding(prep, t, cfg, cash, kind, land, oneway, shelf);
         if (spec && (!best || spec.rate > best.rate)) best = spec;
       }
       return best ? [best] : [];
@@ -3439,7 +3486,7 @@ function plannerCore() {
       for (const land of lands) {
         if (seen.has(land)) continue;
         seen.add(land);
-        const spec = specFromLanding(prep, t, cfg, cash, kind, land, w, oneway, shelf);
+        const spec = specFromLanding(prep, t, cfg, cash, kind, land, oneway, shelf);
         if (!spec) continue;
         if (first === null) first = spec;
         if (!best || spec.rate > best.rate) best = spec;
@@ -3602,6 +3649,7 @@ function plannerCore() {
         windows.push({
           start: Date.parse(w.land_at),
           end: Date.parse(w.land_by),
+          wait: w.wait === true,
           anchors: w.anchors.map((a) => ({
             at: Date.parse(a.at),
             hit: a.hit,
@@ -3712,6 +3760,11 @@ const Plan = (() => {
   const GLOBAL_FAILURE = new Set([
     "backoff", "rate_limited", "busy", "no_token", "bad_token", "no_xhr",
   ]);
+
+  const WAIT_OUT = new Set(["backoff", "rate_limited", "busy"]);
+  const MIN_WAIT_MS = 250;
+  const MAX_WAIT_MS = 20_000;
+  const WAIT_BUDGET_MS = 90_000;
 
   let running = false;
   let stage = null;
@@ -3837,6 +3890,26 @@ const Plan = (() => {
     const missing = [];
     let read = 0;
     let shelfRun = 0;
+    let waited = 0;
+
+    const patient = async (call) => {
+      for (;;) {
+        try {
+          return await call();
+        } catch (err) {
+          const wait = Math.max(MIN_WAIT_MS, Oracle.health().backoffFor);
+          if (!WAIT_OUT.has(err.code) || wait > MAX_WAIT_MS
+              || waited + wait > WAIT_BUDGET_MS) throw err;
+          waited += wait;
+          const reading = stage;
+          stage = "Waiting for Torn Oracle";
+          Bus.emit("plan:stage", stage);
+          await new Promise((r) => setTimeout(r, wait));
+          stage = reading;
+          Bus.emit("plan:stage", stage);
+        }
+      }
+    };
 
     for (let n = 0; n < codes.length; n++) {
       stage = "Reading " + Data.name(codes[n]) + " (" + (n + 1) + " of " + codes.length + ")";
@@ -3844,7 +3917,7 @@ const Plan = (() => {
 
       let shop;
       try {
-        shop = await Oracle.shop(codes[n]);
+        shop = await patient(() => Oracle.shop(codes[n]));
         read += 1;
         shelfRun = 0;
       } catch (err) {
@@ -3859,7 +3932,7 @@ const Plan = (() => {
       }
       let forecasts = {};
       try {
-        const batch = await Oracle.forecasts(codes[n], { travel });
+        const batch = await patient(() => Oracle.forecasts(codes[n], { travel }));
         forecasts = batch.forecasts || {};
       } catch (err) {
         failedCountries += 1;
@@ -4184,15 +4257,65 @@ const Page = (() => {
     return true;
   }
 
+  const textOf = (el) => (el.textContent || "").replace(/\s+/g, " ").trim();
+  const shown = (el) => !el.closest('[inert], [aria-hidden="true"]');
+
+  function homeControl() {
+    const buttons = [...document.querySelectorAll("button")].filter(shown);
+    const done = buttons.find((b) => /^Continue \(\d+\)$/.test(textOf(b)));
+    if (done) return { state: "continue", el: done };
+    const confirm = buttons.find((b) => textOf(b) === "Confirm Travel Back");
+    if (confirm) return { state: "confirm", el: confirm };
+    const link = [...document.querySelectorAll('a[role="button"]')].filter(shown)
+      .find((a) => textOf(a) === "Travel home");
+    return link ? { state: "link", el: link } : null;
+  }
+
+  function travelHomeState() {
+    const control = homeControl();
+    return control ? control.state : null;
+  }
+
+  function pressTravelHome() {
+    const control = homeControl();
+    if (!control) return false;
+    control.el.click();
+    return true;
+  }
+
   const HASH_RE = /(?:^#|&)oracle-to=([a-z]{3})\b/;
 
   function travelLink(code) {
     return "https://www.torn.com/page.php?sid=travel#oracle-to=" + code;
   }
 
-  const LINK_HOLD_MS = 30_000;
-  let linked = null;
-  let holdTimer = null;
+  const SUGGEST_HOLD_MS = 10 * 60_000;
+  const REVEAL_MS = 30_000;
+  let suggestion = null;
+  let revealTimer = null;
+
+  function reveal(code) {
+    const until = Date.now() + REVEAL_MS;
+    clearInterval(revealTimer);
+    const look = () => {
+      const found = mode() === "agency" ? destinationControl(code) : null;
+      if (found) found.el.scrollIntoView({ block: "center", behavior: "smooth" });
+      if (found || Date.now() > until) clearInterval(revealTimer);
+    };
+    revealTimer = setInterval(look, 250);
+    look();
+  }
+
+  function suggest(code, from) {
+    if (!Data.COUNTRIES[code]) return;
+    suggestion = { code, from, until: Date.now() + SUGGEST_HOLD_MS };
+    reveal(code);
+  }
+
+  function suggested() {
+    if (suggestion && Date.now() > suggestion.until) suggestion = null;
+    return suggestion ? { code: suggestion.code, from: suggestion.from } : null;
+  }
 
   function followLink() {
     const m = HASH_RE.exec(location.hash || "");
@@ -4200,24 +4323,90 @@ const Page = (() => {
     try {
       history.replaceState(null, "", location.pathname + location.search);
     } catch {}
-    linked = m[1];
-    const until = Date.now() + LINK_HOLD_MS;
-    let scrolled = preselect(linked);
-    clearInterval(holdTimer);
-    holdTimer = setInterval(() => {
-      if (!linked || Date.now() > until) {
-        clearInterval(holdTimer);
-        linked = null;
-        return;
-      }
-      if (preselect(linked, !scrolled)) scrolled = true;
-    }, 250);
+    suggest(m[1], "link");
   }
 
   document.addEventListener("click", (ev) => {
-    if (!linked || !ev.isTrusted || !ev.target.closest) return;
-    if (ev.target.closest('li[role="option"], button[aria-pressed]')) linked = null;
+    if (!suggestion || !ev.isTrusted || !ev.target.closest) return;
+    if (ev.target.closest('li[role="option"], button[aria-pressed]')) suggestion = null;
   }, true);
+
+  const pageWindow = (() => {
+    try {
+      if (typeof unsafeWindow !== "undefined" && unsafeWindow) return unsafeWindow;
+    } catch {}
+    return window;
+  })();
+
+  let tornStoreRef = null;
+
+  function tornStore() {
+    if (tornStoreRef) return tornStoreRef;
+    try {
+      const root = pageWindow.document.getElementById("travel-root");
+      if (!root) return null;
+      const key = Object.keys(root).find((k) => k.startsWith("__reactContainer$"));
+      let fiber = key ? root[key] : null;
+      for (let depth = 0; fiber && depth < 10; depth += 1) {
+        const store = fiber.memoizedProps && fiber.memoizedProps.store;
+        if (store && typeof store.getState === "function") {
+          tornStoreRef = store;
+          return store;
+        }
+        fiber = fiber.child;
+      }
+    } catch {}
+    return null;
+  }
+
+  function tornData(endpoint) {
+    const store = tornStore();
+    if (!store) return null;
+    try {
+      const queries = (store.getState().travelApi || {}).queries || {};
+      let best = null;
+      for (const q of Object.values(queries)) {
+        if (!q || q.endpointName !== endpoint || !q.data) continue;
+        if (!best || (q.fulfilledTimeStamp || 0) > (best.fulfilledTimeStamp || 0)) best = q;
+      }
+      return best ? { data: best.data, at: best.fulfilledTimeStamp || 0 } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const inPage = (value) => pageWindow.JSON.parse(JSON.stringify(value));
+
+  function patchTorn(endpoint, build) {
+    const store = tornStore();
+    if (!store) return false;
+    try {
+      let patched = false;
+      const queries = (store.getState().travelApi || {}).queries || {};
+      for (const [key, q] of Object.entries(queries)) {
+        if (!q || q.endpointName !== endpoint || !q.data || q.status === "pending") continue;
+        const patches = build(q.data);
+        if (!patches.length) continue;
+        store.dispatch(inPage({ type: "travelApi/queries/queryResultPatched",
+                                payload: { queryCacheKey: key, patches } }));
+        patched = true;
+      }
+      return patched;
+    } catch {
+      return false;
+    }
+  }
+
+  function emptyTornSlots(held) {
+    return held.length > 0 && patchTorn("inventory", (data) => (Array.isArray(data.slots) ? data.slots : [])
+      .flatMap((s, i) => (s && s.item && held.some((h) => h.ID === s.ID && h.itemID === Number(s.item.ID))
+        ? [{ op: "replace", path: ["slots", i, "item"], value: null }] : [])));
+  }
+
+  function moveTornCash(by, was) {
+    return by !== 0 && typeof was === "number" && patchTorn("shop", (data) => (data.money === was
+      ? [{ op: "replace", path: ["money"], value: Math.max(0, data.money + by) }] : []));
+  }
 
   function onTravelPress(ask) {
     window.addEventListener("click", (ev) => {
@@ -4370,6 +4559,17 @@ const Page = (() => {
     return document.body.dataset.layout === "hospital";
   }
 
+  function hospitalUntil() {
+    const banner = document.querySelector("#topHeaderBanner");
+    if (!banner) return null;
+    const stamp = Number(banner.getAttribute("data-hospital"));
+    return stamp > 0 ? stamp * 1000 : 0;
+  }
+
+  function refreshTorn() {
+    try { window.dispatchEvent(new Event("focus")); } catch {}
+  }
+
   function placeBar(bar) {
     const root = document.querySelector("#travel-root");
     if (!root || !root.parentNode) {
@@ -4385,8 +4585,9 @@ const Page = (() => {
   return {
     PANEL_ID, mode, agencyOnPage, hasMap, place, watch, onFormChange,
     selectedTravelType, selectedDestination, travelInventory, darkMode,
-    shopRows, shopWallet, hospitalLayout, placeBar,
-    canPreselect, preselect, travelLink, followLink, onTravelPress,
+    shopRows, shopWallet, hospitalLayout, hospitalUntil, placeBar, refreshTorn,
+    canPreselect, preselect, travelLink, followLink, suggest, suggested, onTravelPress,
+    tornData, emptyTornSlots, moveTornCash, travelHomeState, pressTravelHome,
   };
 })();
 
@@ -4949,46 +5150,89 @@ const Style = (() => {
 }
 
 #oracle-assist {
-  --oa-bg: #ffffff; --oa-line: #dde3e9; --oa-text: #10161c; --oa-dim: #4a5763;
-  --oa-accent: #0d9488; --oa-go: #047857; --oa-warn: #b45309;
+  --oa-bg: #ffffff; --oa-tint: #f3f6f8; --oa-line: #dde3e9; --oa-text: #10161c; --oa-dim: #4a5763;
+  --oa-accent: #0d9488; --oa-go: #047857; --oa-on: #ffffff; --oa-warn: #b45309; --oa-warn-bg: #fdf3e4;
+  --oa-shade: rgba(16, 22, 28, 0.07); --oa-glow: rgba(4, 120, 87, 0.16); --oa-stripe: var(--oa-accent);
   position: sticky; top: 0; z-index: 50;
   box-sizing: border-box; width: 100%; margin: 0 0 8px;
-  padding: 8px 10px; border: 1px solid var(--oa-line); border-radius: 10px;
+  padding: 10px 12px 10px 15px; border: 1px solid var(--oa-line); border-radius: 12px;
   background: var(--oa-bg); color: var(--oa-text);
+  box-shadow: inset 3px 0 0 var(--oa-stripe), 0 1px 2px var(--oa-shade), 0 6px 16px var(--oa-shade);
   font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  transition: box-shadow 0.25s ease;
 }
 #oracle-assist.o-dark {
-  --oa-bg: #171d24; --oa-line: #2c3742; --oa-text: #e7edf3; --oa-dim: #b3c0cd;
-  --oa-accent: #2dd4bf; --oa-go: #34d399; --oa-warn: #fbbf24;
+  --oa-bg: #171d24; --oa-tint: #1f2832; --oa-line: #2c3742; --oa-text: #e7edf3; --oa-dim: #b3c0cd;
+  --oa-accent: #2dd4bf; --oa-go: #34d399; --oa-on: #06211d; --oa-warn: #fbbf24;
+  --oa-warn-bg: rgba(251, 191, 36, 0.1); --oa-shade: rgba(0, 0, 0, 0.3); --oa-glow: rgba(52, 211, 153, 0.2);
+}
+#oracle-assist.is-ready {
+  --oa-stripe: var(--oa-go);
+  box-shadow: inset 3px 0 0 var(--oa-stripe), 0 0 0 3px var(--oa-glow), 0 6px 16px var(--oa-shade);
 }
 #oracle-assist[hidden] { display: none; }
 #oracle-assist * { box-sizing: border-box; }
-#oracle-assist .oa-line { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
-#oracle-assist .oa-brand { font-weight: 700; font-size: 11px; color: var(--oa-accent); }
-#oracle-assist .oa-note { font-size: 12px; color: var(--oa-dim); }
-#oracle-assist .oa-acts { display: flex; gap: 6px; }
-#oracle-assist button.oa-skip {
-  appearance: none; flex: none; min-height: 44px; padding: 0 12px; cursor: pointer;
-  font: inherit; font-size: 12px; font-weight: 600; border-radius: 8px;
-  border: 1px solid var(--oa-line); background: transparent; color: var(--oa-dim);
+#oracle-assist .oa-line { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; min-width: 0; }
+#oracle-assist .oa-brand {
+  flex: none; font-weight: 700; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--oa-accent); white-space: nowrap;
+}
+#oracle-assist .oa-brand::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; vertical-align: 1px;
+  border-radius: 50%; background: var(--oa-stripe);
+}
+#oracle-assist.is-watch .oa-brand::before { animation: oa-breathe 2s ease-in-out infinite; }
+#oracle-assist .oa-note { min-width: 0; font-size: 12px; color: var(--oa-dim); }
+#oracle-assist .oa-acts { display: flex; gap: 6px; align-items: stretch; }
+#oracle-assist button.oa-skip, #oracle-assist button.oa-refresh {
+  appearance: none; flex: none; min-height: 44px; padding: 0 14px; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 600; border-radius: 9px;
+  border: 1px solid var(--oa-line); background: var(--oa-bg); color: var(--oa-dim);
   touch-action: manipulation; user-select: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+#oracle-assist button.oa-skip:hover, #oracle-assist button.oa-refresh:hover {
+  background: var(--oa-tint); color: var(--oa-text);
 }
 #oracle-assist button.oa-skip[hidden] { display: none; }
+#oracle-assist button.oa-refresh {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; padding: 0;
+}
+#oracle-assist button.oa-refresh svg { display: block; }
+#oracle-assist button.oa-refresh.is-spin svg { animation: oa-spin 0.6s ease-out; }
 #oracle-assist button.oa-go {
-  appearance: none; display: block; flex: 1 1 auto; width: 100%; min-height: 44px; cursor: pointer;
-  font: inherit; font-size: 15px; font-weight: 700; border-radius: 8px;
-  border: 1px solid var(--oa-accent); background: var(--oa-accent); color: #fff;
+  appearance: none; display: block; flex: 1 1 auto; width: 100%; min-height: 44px; padding: 0 12px;
+  cursor: pointer; font: inherit; font-size: 15px; font-weight: 700; letter-spacing: 0.01em;
+  border-radius: 9px; border: 1px solid var(--oa-accent); color: var(--oa-on);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0)) var(--oa-accent);
+  box-shadow: 0 1px 2px var(--oa-shade), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   touch-action: manipulation; user-select: none;
+  transition: filter 0.15s ease, transform 0.08s ease;
 }
+#oracle-assist button.oa-go:not(:disabled):hover { filter: brightness(1.07); }
+#oracle-assist button.oa-go:not(:disabled):active { transform: translateY(1px); }
 #oracle-assist button.oa-go:disabled {
-  cursor: default; background: transparent; color: var(--oa-dim); border-color: var(--oa-line);
+  cursor: default; background: var(--oa-tint); color: var(--oa-dim); border-color: var(--oa-line);
+  box-shadow: none;
 }
-#oracle-assist.is-ready button.oa-go { background: var(--oa-go); border-color: var(--oa-go); animation: oa-pulse 1.2s ease-in-out 3; }
-#oracle-assist .oa-msg { font-size: 12px; color: var(--oa-dim); margin-top: 6px; }
+#oracle-assist.is-ready button.oa-go {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0)) var(--oa-go);
+  border-color: var(--oa-go); animation: oa-pulse 1.2s ease-in-out 3;
+}
+#oracle-assist button:focus-visible { outline: 2px solid var(--oa-accent); outline-offset: 2px; }
+#oracle-assist .oa-msg {
+  margin-top: 8px; padding: 6px 10px; border-radius: 8px;
+  font-size: 12px; color: var(--oa-dim); background: var(--oa-tint);
+}
 #oracle-assist .oa-msg:empty { display: none; }
-#oracle-assist .oa-msg.is-warn { color: var(--oa-warn); }
+#oracle-assist .oa-msg.is-warn { color: var(--oa-warn); background: var(--oa-warn-bg); }
 @keyframes oa-pulse { 50% { filter: brightness(1.25); } }
-@media (prefers-reduced-motion: reduce) { #oracle-assist button.oa-go { animation: none !important; } }
+@keyframes oa-breathe { 50% { opacity: 0.35; } }
+@keyframes oa-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  #oracle-assist button.oa-go, #oracle-assist .oa-brand::before,
+  #oracle-assist button.oa-refresh svg { animation: none !important; }
+}
 
 #travel-root.tt-clean-flight [class*="viewport___"], #travel-root.tt-travel-table-hide-plane [class*="viewport___"],
 :root:has(#pda-remove-plane) #travel-root [class*="viewport___"] { height: auto; }
@@ -6134,7 +6378,8 @@ const ViewPlan = (() => {
     if (status.running) {
       return `<div class="o-note">${Fmt.esc(status.stage || "Planning…")}</div>`;
     }
-    if (!s.active) return "";
+    const offer = Plan.offered();
+    if (!s.active) return offer && offer.note ? `<div class="o-note">${Fmt.esc(offer.note)}</div>` : "";
 
     const out = [];
     const open = s.runtime.findIndex((rt) => rt.ambiguous);
@@ -6143,8 +6388,9 @@ const ViewPlan = (() => {
         ${Fmt.esc(Data.name(Trip.legCountry(open)))}.
         <button type="button" class="o-link" data-act="edit-buy" data-leg="${open}">Record</button></div>`);
     }
-    if (s.planNote && !Trip.started()) {
-      out.push(`<div class="o-note">${Fmt.esc(s.planNote)}</div>`);
+    const note = offer ? offer.note : Trip.started() ? null : s.planNote;
+    if (note) {
+      out.push(`<div class="o-note">${Fmt.esc(note)}</div>`);
     }
     const escort = Escort.explain();
     if (Settings.get("escort_on") && !escort.ok) {
@@ -6366,7 +6612,8 @@ const ViewShops = (() => {
       Assist.beep();
       Env.toast("Time to leave", text, () => {
         try { window.focus(); } catch {}
-        Page.preselect(code);
+        Page.suggest(code, "alert");
+        Assist.paint();
       });
       Panel.flash(text, "go", "shops");
       Env.log.event("bell: " + text);
@@ -7768,8 +8015,8 @@ const ViewSettings = (() => {
     return section("share", ...SECTIONS.share, `
       <div class="o-row is-stack">
         <span class="o-row-text">
-          <span class="o-row-help">Trips, what to buy and forecast settings. Your key, account and
-            alerts are not included.</span>
+          <span class="o-row-help">Trips, what to buy, forecast and Assist settings. Your key,
+            account, alerts, travel method, suitcase size and company slots are not included.</span>
         </span>
         <textarea class="o-share" data-share rows="6" spellcheck="false"
           placeholder="Paste settings here to import them"
@@ -7817,7 +8064,7 @@ const ViewSettings = (() => {
       <div class="o-row is-stack">
         <span class="o-row-text">
           <span class="o-row-help">A preset holds your trips, what to buy and forecast settings and
-            your Assist tab. Presets stay on this device.</span>
+            your Assist tab. Your presets follow you to your other devices.</span>
         </span>
         <div class="o-keyform">
           <input type="text" data-preset maxlength="${Settings.MAX_PRESET_NAME}"
@@ -8534,86 +8781,256 @@ const Assist = (() => {
     return Array.isArray(slots) ? slots : [];
   }
 
-  let slots = null;
-  let slotsLoading = null;
+  let bagRead = null;
+  const spent = new Map();
+  const found = new Map();
 
-  function readSlots() {
-    if (!slotsLoading) {
-      slotsLoading = travelData("inventory").then((inv) => {
-        slotsLoading = null;
-        const list = slotsOf(inv.data);
-        slots = inv.ok || list.length ? list : null;
-        return inv;
-      });
-    }
-    return slotsLoading;
+  function bagSlots() {
+    const torn = Page.tornData("inventory");
+    const fromTorn = torn ? { slots: slotsOf(torn.data), at: torn.at } : null;
+    const src = !bagRead || (fromTorn && fromTorn.at >= bagRead.at) ? fromTorn : bagRead;
+    if (!src) return null;
+    return src.slots.filter((s) => s && !(spent.get(s.ID) > src.at));
   }
 
-  async function useItem(ref) {
-    const holds = (s) => s && s.item && Number(s.item.ID) === ref.id;
-    const inv = Page.travelInventory();
-    const onPage = inv ? inv.items.filter((n) => n === ref.name).length : Infinity;
-    if (!slots || onPage < slots.filter(holds).length) {
-      const read = await readSlots();
-      if (!slots) return read;
-    }
-    const i = slots.findIndex(holds);
-    if (i < 0) return { ok: false, message: "No " + ref.name + " in your travel inventory." };
-    const [slot] = slots.splice(i, 1);
-    const res = await travelData("useItem", { method: "POST", body: { slotID: slot.ID } });
-    if (!res.ok) slots = null;
+  const holds = (ref) => (s) => !!s.item && Number(s.item.ID) === ref.id;
+
+  async function readBag() {
+    const res = await travelData("inventory");
+    const list = slotsOf(res.data);
+    if (res.ok || list.length) bagRead = { slots: list, at: Date.now() };
     return res;
   }
 
+  async function useItem(ref) {
+    const slot = (bagSlots() || []).find(holds(ref));
+    if (!slot) return { ok: false, message: "No " + ref.name + " in your travel inventory." };
+    const res = await travelData("useItem", { method: "POST", body: { slotID: slot.ID } });
+    const removed = res.ok && !(res.data && res.data.itemRemoved === false);
+    if (removed) spent.set(slot.ID, Date.now());
+    return Object.assign(res, { removed, emptied: removed ? [{ ID: slot.ID, itemID: ref.id }] : null });
+  }
+
   async function sellItem(ref) {
-    const read = await readSlots();
-    if (!slots) return read;
-    const held = slots.filter((s) => s && s.item && Number(s.item.ID) === ref.id
-                                     && s.item.isSellable !== false);
-    slots = null;
+    const held = (bagSlots() || []).filter((s) => holds(ref)(s) && s.item.isSellable !== false);
     if (!held.length || held[0].item.sellValue === 0) {
       return { ok: false, refused: true, message: "This shop does not buy " + ref.name + "." };
     }
+    const value = held.length * (Number(held[0].item.sellValue) || 0);
     const res = await travelData("sellItem", {
       method: "POST", body: { slotID: held[0].ID, amount: held.length },
     });
-    return Object.assign(res, { refused: !res.ok && !!res.data });
+    if (res.ok) for (const s of held) spent.set(s.ID, Date.now());
+    return Object.assign(res, {
+      refused: !res.ok && !!res.data, sold: held.length, value,
+      emptied: res.ok ? held.map((s) => ({ ID: s.ID, itemID: ref.id })) : null, cash: res.ok ? value : 0,
+    });
   }
 
-  async function owned(ref) {
-    const found = await travelData("searchItem", { method: "POST", form: { q: ref.name } });
-    const list = found.data && Array.isArray(found.data.list) ? found.data.list : [];
-    return list.filter((e) => e && e.name === ref.name && !e.disabled);
+  async function buyItem(ref, amount, price) {
+    const res = await travelData("buy", { query: "&itemID=" + ref.id + "&amount=" + amount });
+    const got = (res.ok && res.data) || {};
+    const bought = Number(got.amount) || amount;
+    const total = Number(got.total) || bought * (price || 0);
+    return Object.assign(res, { bought, total, cash: res.ok ? -total : 0 });
   }
 
-  const missing = (ref) => ({ ok: false, refused: true, message: "No " + ref.name + " in your inventory.",
-    link: "https://www.torn.com/page.php?sid=ItemMarket#/market/view=search&itemID=" + ref.id });
-
-  async function packItem(ref, fill) {
-    const named = await owned(ref);
-    const hit = named.find((e) => !e.faction) || named[0];
-    if (!hit) return missing(ref);
-    const body = { itemID: hit.id };
-    if (hit.armouryID) body.armouryID = hit.armouryID;
-    if (hit.faction) body.factionItem = "1";
-    return travelData(fill ? "fillSlotItems" : "addSlotItem", { method: "POST", body });
+  async function findItem(ref) {
+    const res = await travelData("searchItem", { method: "POST", form: { q: ref.name } });
+    if (!res.ok) return res;
+    const list = res.data && Array.isArray(res.data.list) ? res.data.list : [];
+    const hits = list.filter((e) => e && e.name === ref.name && !e.disabled
+                                     && (Settings.get("fork_kit_faction") || !e.faction))
+      .sort((a, b) => Number(!!a.faction) - Number(!!b.faction))
+      .map((e) => ({ armouryID: e.armouryID || null, faction: !!e.faction,
+                     left: e.armouryID ? 1 : Math.max(1, Number(e.quantity) || 1) }));
+    if (!hits.length) {
+      return { ok: false, refused: true, message: "No " + ref.name + " in your inventory.",
+               link: "https://www.torn.com/page.php?sid=ItemMarket#/market/view=search&itemID=" + ref.id };
+    }
+    found.set(ref.name, hits);
+    return { ok: true, message: "" };
   }
 
-  async function fillItem(ref) {
-    const hit = (await owned(ref)).find((e) => !e.faction);
-    if (!hit) return missing(ref);
-    const res = await travelData("fillSlotItems", { method: "POST", body: { itemID: hit.id } });
-    return Object.assign(res, { refused: !res.ok && !!res.data });
+  const SOURCE_KEY = "assist_source";
+  const NONE_RE = /does(?:n['’]t| not) exist/i;
+  const refusedFrom = new Map();
+  const packedOwn = new Set();
+
+  function factionFirst(name) {
+    const saved = Env.read(SOURCE_KEY, null);
+    return !!saved && typeof saved === "object" && saved[name] === "faction";
+  }
+
+  function saveSource(name, faction) {
+    const saved = Object.assign({}, Env.read(SOURCE_KEY, null) || {});
+    if (faction === (saved[name] === "faction")) return;
+    if (faction) saved[name] = "faction";
+    else delete saved[name];
+    Env.write(SOURCE_KEY, saved);
+  }
+
+  function packSource(name) {
+    const armoury = Settings.get("fork_kit_faction");
+    const first = armoury && factionFirst(name) ? "faction" : "own";
+    const tried = refusedFrom.get(name) || new Set();
+    if (!tried.has(first)) return first;
+    const other = first === "faction" ? "own" : armoury ? "faction" : null;
+    return !other || tried.has(other) ? null : other;
+  }
+
+  async function packItem(ref) {
+    const hits = found.get(ref.name) || [];
+    const hit = hits[0];
+    const from = hit ? null : packSource(ref.name);
+    const body = { itemID: ref.id };
+    if (hit && hit.armouryID) body.armouryID = hit.armouryID;
+    if (hit ? hit.faction : from === "faction") body.factionItem = "1";
+    const res = await travelData("addSlotItem", { method: "POST", body });
+    if (hit) {
+      if (res.ok) hit.left -= 1;
+      if (res.ok ? hit.left <= 0 : res.data) hits.shift();
+      return res;
+    }
+    if (res.ok) {
+      if (from === "own") packedOwn.add(ref.name);
+      saveSource(ref.name, from === "faction" && !packedOwn.has(ref.name));
+      return res;
+    }
+    if (!res.data || !NONE_RE.test(res.message)) return res;
+    refusedFrom.set(ref.name, new Set([...(refusedFrom.get(ref.name) || []), from]));
+    const next = packSource(ref.name);
+    if (!next) skipPack.add(ref.name);
+    res.message = !next ? "You have no " + ref.name + "."
+      : from === "own" ? "You have no " + ref.name + " of your own."
+                       : "Your faction has no " + ref.name + ".";
+    if (!next) res.link = "https://www.torn.com/page.php?sid=ItemMarket#/market/view=search&itemID=" + ref.id;
+    return res;
+  }
+
+  async function fillItem(ref, room) {
+    const res = await travelData("fillSlotItems", { method: "POST", body: { itemID: ref.id } });
+    const refused = !res.ok && !!res.data;
+    if (res.ok || refused) skipPack.add(ref.name);
+    const order = res.ok && Array.isArray(res.data.slotFillOrder) ? res.data.slotFillOrder : null;
+    if (order && room > order.length) {
+      res.message = (res.message + " That is all your " + ref.name + ".").trim();
+    }
+    if (refused && NONE_RE.test(res.message)) {
+      res.message = "You have no " + ref.name + ".";
+      res.link = "https://www.torn.com/page.php?sid=ItemMarket#/market/view=search&itemID=" + ref.id;
+    }
+    return Object.assign(res, { refused });
   }
 
   const ACTIONS = {
-    pack: (d) => packItem(d.ref, d.fill),
-    fill: (d) => fillItem(d.ref),
+    bag: () => readBag(),
+    find: (d) => findItem(d.ref),
+    pack: (d) => packItem(d.ref),
+    fill: (d) => fillItem(d.ref, d.room),
     sell: (d) => sellItem(d.ref),
     use: (d) => useItem(d.ref),
-    buy: (d) => travelData("buy", { query: "&itemID=" + d.ref.id + "&amount=" + d.amount }),
-    fly: () => travelData("travelHome", { method: "POST" }),
+    buy: (d) => buyItem(d.ref, d.amount, d.price),
   };
+
+  let edits = [];
+
+  function pageNow(mode) {
+    const inv = Page.travelInventory();
+    const wallet = mode === "abroad" ? Page.shopWallet() : null;
+    const rows = mode === "abroad" ? Page.shopRows() : [];
+    return {
+      inv, wallet, rows,
+      bagKey: JSON.stringify([inv && [inv.packed, inv.items], wallet && [wallet.taken, wallet.capacity]]),
+      cashKey: wallet ? wallet.money : null,
+    };
+  }
+
+  function record(before, change) {
+    const add = change.add || [];
+    const drop = change.drop || [];
+    const row = change.stock ? before.rows.find((r) => r.id === change.stock.id) : null;
+    edits.push({
+      bag: add.length || drop.length ? before.bagKey : null, add, drop, special: change.special || 0,
+      cash: change.cash && before.cashKey !== null ? before.cashKey : null, cashBy: change.cash || 0,
+      stock: row ? { id: row.id, was: row.stock, by: change.stock.by } : null,
+    });
+  }
+
+  function corrected(now) {
+    for (const e of edits) {
+      if (e.bag !== null && e.bag !== now.bagKey) {
+        e.bag = e.rebag ? now.bagKey : null;
+        e.rebag = false;
+      }
+      if (e.cash !== null && e.cash !== now.cashKey) {
+        e.cash = e.recash ? now.cashKey : null;
+        e.recash = false;
+      }
+      if (e.stock) {
+        const row = now.rows.find((r) => r.id === e.stock.id);
+        if (!row || row.stock !== e.stock.was) e.stock = null;
+      }
+    }
+    edits = edits.filter((e) => e.bag !== null || e.cash !== null || e.stock);
+    const items = now.inv ? [...now.inv.items] : null;
+    let moved = 0;
+    let special = 0;
+    let cash = 0;
+    const stock = new Map();
+    for (const e of edits) {
+      if (e.bag !== null) {
+        moved += e.add.length - e.drop.length;
+        special += e.special;
+        if (items) {
+          items.push(...e.add);
+          for (const name of e.drop) {
+            const i = items.indexOf(name);
+            if (i >= 0) items.splice(i, 1);
+          }
+        }
+      }
+      if (e.cash !== null) cash += e.cashBy;
+      if (e.stock) stock.set(e.stock.id, (stock.get(e.stock.id) || 0) + e.stock.by);
+    }
+    return {
+      inv: now.inv && { ...now.inv, items, packed: now.inv.packed + moved },
+      wallet: now.wallet && { ...now.wallet, taken: now.wallet.taken + moved - special,
+                              extra: Math.max(0, (now.wallet.extra || 0) - special), money: now.wallet.money + cash },
+      rows: now.rows.map((r) => (stock.has(r.id) ? { ...r, stock: Math.max(0, r.stock + stock.get(r.id)) } : r)),
+    };
+  }
+
+  function changeOf(step, res, before) {
+    const n = (count) => Array(Math.max(0, count)).fill(step.ref.name);
+    if (step.act === "pack") return { add: n(1) };
+    if (step.act === "fill") {
+      const order = res.data && Array.isArray(res.data.slotFillOrder) ? res.data.slotFillOrder : null;
+      return { add: n(order ? order.length : before.room || 0) };
+    }
+    if (step.act === "use") return res.removed ? { drop: n(1) } : {};
+    if (step.act === "sell") return { drop: n(res.sold || 0), cash: res.value || 0 };
+    if (step.act === "buy") {
+      const got = res.bought || step.amount;
+      const row = before.rows.find((r) => r.id === step.ref.id);
+      const w = before.wallet;
+      const special = w && row && row.type === w.extraType ? Math.min(got, w.extra || 0) : 0;
+      return { add: n(got), special, cash: -(res.total || got * (step.price || 0)),
+               stock: { id: step.ref.id, by: -got } };
+    }
+    return {};
+  }
+
+  function showInTorn(res, cashWas) {
+    corrected(pageNow(Page.mode()));
+    const bag = !!res.emptied && Page.emptyTornSlots(res.emptied);
+    const cash = !!res.cash && Page.moveTornCash(res.cash, cashWas);
+    for (const e of edits) {
+      if (bag && e.bag !== null) e.rebag = true;
+      if (cash && e.cash !== null) e.recash = true;
+    }
+    return { bag, cash };
+  }
 
   const WINDOWS_EVERY_MS = 5 * 60_000;
 
@@ -8659,10 +9076,23 @@ const Assist = (() => {
     Env.write(VISIT_KEY, Object.assign(visit(), patch));
   }
 
+  let apiHosp = { key: null, at: 0 };
+
+  function hospKey() {
+    const until = Page.hospitalUntil();
+    if (until === null) return Page.hospitalLayout() ? "layout" : null;
+    return until > Date.now() ? String(until) : null;
+  }
+
   function inHospital() {
-    if (visit().medOut) return false;
-    if (observed && observed.at > loadedAt) return observed.state === "Hospital";
-    return Page.hospitalLayout();
+    const key = hospKey();
+    const v = visit();
+    if (!key) {
+      return Page.hospitalUntil() === null && !!observed && observed.at > loadedAt
+        && observed.state === "Hospital";
+    }
+    if (v.medOut && v.medKey === key) return false;
+    return !(apiHosp.key === key && observed && observed.state !== "Hospital" && observed.at > apiHosp.at);
   }
 
   const BEST_KEY = "assist_best";
@@ -8761,16 +9191,31 @@ const Assist = (() => {
   function selectTarget() {
     const trip = Trip.get();
     const leg = trip.active ? Trip.currentLeg() : null;
-    let target = null;
-    if (leg && leg.runtime.status === "pending") target = { code: leg.country, from: "plan" };
+    let target = Page.suggested();
+    if (target) target = { code: target.code, from: target.from };
+    else if (leg && leg.runtime.status === "pending") target = { code: leg.country, from: "plan" };
     else if (!trip.active && ViewShops.picked()) target = { code: ViewShops.picked(), from: "shops" };
     if (!target || target.code === skippedSelect || !Page.canPreselect(target.code)) return null;
     return target;
   }
 
-  function facts() {
+  const mustFind = (name) => {
+    const known = byName ? byName.get(name) : null;
+    return !known || known.type === "Weapon" || known.type === "Armor";
+  };
+
+  let catalogueAt = 0;
+
+  function loadCatalogue() {
+    if (byName || Date.now() - catalogueAt < 60_000) return;
+    catalogueAt = Date.now();
+    itemCatalogue().then(() => paint()).catch(() => {});
+  }
+
+  function facts(seen) {
     const mode = Page.mode();
-    const inv = Page.travelInventory();
+    const now = seen || corrected(pageNow(mode));
+    const inv = now.inv;
     const v = visit();
     const kit = Settings.get("assist_kit");
     const pick = mode === "agency" ? exportPick() : null;
@@ -8790,16 +9235,62 @@ const Assist = (() => {
       room: inv ? inv.slots - inv.packed : null,
       hospital: inHospital(),
       outbound: Trip.get().phase === "outbound",
-      rows: mode === "abroad" ? Page.shopRows() : [],
-      wallet: mode === "abroad" ? Page.shopWallet() : null,
+      rows: now.rows,
+      wallet: now.wallet,
       bought: v.bought === true,
       medOut: v.medOut === true,
       medFree: v.medOut === true && Date.now() - (v.medAt || 0) < MED_FREE_MS ? v.medFree : null,
       hospUsed: v.hospUsed === true,
+      slotsKnown: mode === "agency" ? true : bagSlots() !== null,
+      findFirst: mode === "agency" ? (kit.extras || []).map((e) => e.name).filter(mustFind) : [],
+      found: Object.fromEntries([...found].map(([name, hits]) => [name, hits.length])),
+      faction: mode === "agency" ? [...kitNames(kit)].filter((name) => packSource(name) === "faction") : [],
+      home: mode === "abroad" ? Page.travelHomeState() : null,
     };
   }
 
+  const SUGGESTED_BY = {
+    plan: "Suggested from your plan.",
+    shops: "Suggested from the Shops tab you're currently viewing.",
+    link: "Suggested from the link you opened.",
+    alert: "Suggested from your alert.",
+  };
+
+  function selectStep(f) {
+    const t = f.target;
+    const now = f.selected ? " " + Data.name(f.selected) + " is currently selected." : "";
+    return { act: "select", code: t.code, skip: "select",
+             label: "Select " + Data.name(t.code), note: (SUGGESTED_BY[t.from] || "") + now };
+  }
+
   function decide(f) {
+    if (f.home === "continue") return { act: "fly", label: "Continue", note: "Shows your flight home." };
+    if (f.mode === "agency" && f.target && (f.target.from === "link" || f.target.from === "alert")
+        && f.selected !== f.target.code) {
+      return selectStep(f);
+    }
+    const step = nextStep(f);
+    if (step && step.act === "fly") {
+      if (f.home === "confirm") return Object.assign({}, step, { label: "Confirm travel back" });
+      if (f.home === null) {
+        return { label: step.label, note: "Torn's Travel home button is not on this page.", ready: step.ready };
+      }
+      return step;
+    }
+    if (!step || f.slotsKnown !== false) return step;
+    if (step.act === "use" || step.act === "sell") {
+      return Object.assign({}, step, { act: "bag", label: "Read your bag", note: "Next: " + step.label + "." });
+    }
+    const med = f.kit && f.kit.med;
+    const medIn = !!med && (f.carried || []).includes(med.name) && !(f.skipped || {}).med;
+    if (step.watch && f.hospital && medIn) {
+      return Object.assign({}, step, { act: "bag", label: "Read your bag",
+                                       note: "Then the med-out is one press when stock arrives." });
+    }
+    return step;
+  }
+
+  function nextStep(f) {
     const count = (ref) => (ref && f.carried ? f.carried.filter((n) => n === ref.name).length : 0);
     const kit = f.kit || { hosp: null, hosps: 0, med: null, meds: 0, extras: [] };
 
@@ -8815,14 +9306,7 @@ const Assist = (() => {
       for (const e of kit.extras || []) need.push({ ref: { id: e.id, name: e.name }, n: e.n });
       const fill = f.fill;
       if (!f.carried || (!need.length && !f.exportOn && !toSell)) return null;
-      const t = f.target;
-      if (t && f.selected !== t.code) {
-        const why = t.from === "plan" ? "Suggested from your plan."
-          : "Suggested from the Shops tab you're currently viewing.";
-        const now = f.selected ? " " + Data.name(f.selected) + " is currently selected." : "";
-        return { act: "select", code: t.code, skip: "select",
-                 label: "Select " + Data.name(t.code), note: why + now };
-      }
+      if (f.target && f.selected !== f.target.code) return selectStep(f);
       if (!need.length && !fill && !toSell) return null;
       for (const { ref, n } of need) {
         const have = count(ref);
@@ -8831,16 +9315,21 @@ const Assist = (() => {
             if (have > 0) continue;
             return { label: "Your bag is full", note: "No room for " + ref.name + "." };
           }
-          if (f.room !== null && f.room > 1 && n - have >= f.room) {
-            return { act: "pack", ref, fill: true, skip: "pack",
+          if ((f.findFirst || []).includes(ref.name) && !((f.found || {})[ref.name] > 0)) {
+            return { act: "find", ref, skip: "pack", label: "Find " + ref.name,
+                     note: "Looks in your inventory." };
+          }
+          if (f.room !== null && f.room > 1 && n - have >= f.room && !(f.faction || []).includes(ref.name)) {
+            return { act: "fill", ref, room: f.room, skip: "pack",
                      label: "Fill " + ref.name + " (" + f.room + " slots)" };
           }
           return { act: "pack", ref, skip: "pack",
-                   label: "Pack " + ref.name + " (" + (have + 1) + " of " + n + ")" };
+                   label: "Pack " + ref.name + " (" + (have + 1) + " of " + n + ")",
+                   note: (f.faction || []).includes(ref.name) ? "From your faction." : "" };
         }
       }
       if (fill && f.room > 0) {
-        return { act: "fill", ref: fill, skip: "pack", label: "Pack " + fill.name + " to sell",
+        return { act: "fill", ref: fill, room: f.room, skip: "pack", label: "Pack " + fill.name + " to sell",
                  note: "Fills your " + f.room + " free slots." };
       }
       return { label: need.length ? "Trip kit packed" : "Packed", note: "Ready to fly." };
@@ -8947,34 +9436,53 @@ const Assist = (() => {
 
   function settling() {
     if (!settle) return false;
-    if (Date.now() > settle.until || pageKey() !== settle.key) { settle = null; return false; }
+    if (Date.now() > settle.until || (settle.key !== null && pageKey() !== settle.key)) {
+      settle = null;
+      return false;
+    }
     return true;
   }
 
   async function press() {
     if (busy || settling()) return;
-    const before = facts();
+    const page = pageNow(Page.mode());
+    const before = facts(corrected(page));
     const step = decide(before);
     if (!step || !step.act) return;
+    if (step.act === "fly") {
+      Page.pressTravelHome();
+      message = null;
+      setTimeout(paint, 300);
+      return;
+    }
     if (step.act === "select") {
       Page.preselect(step.code, false);
       message = null;
       setTimeout(paint, 300);
       return;
     }
+    const shop = Page.tornData("shop");
+    const cashWas = shop && shop.data ? shop.data.money : null;
+    const stay = hospKey();
     busy = true;
     paint();
     let res;
     try { res = await ACTIONS[step.act](step); }
     finally { busy = false; }
+    if (res.ok) {
+      const change = changeOf(step, res, before);
+      const shown = showInTorn(res, cashWas);
+      if (shown.bag) Object.assign(change, { add: [], drop: [] });
+      if (shown.cash) change.cash = 0;
+      record(page, change);
+    }
     const kit = Settings.get("assist_kit");
     const med = step.act === "use" && !!kit.med && step.ref.id === kit.med.id;
-    if (step.act === "fill" && res.refused) skipPack.add(step.ref.name);
     if (step.act === "sell" && (res.ok || (res.refused && !inHospital()))) {
       markVisit({ sell: (visit().sell || []).filter((r) => r.id !== step.ref.id) });
     }
     if (res.ok && (step.act === "buy" || step.act === "sell")) {
-      if (step.act === "buy") Trip.pageBuy(step.ref, step.amount, step.price);
+      if (step.act === "buy") Trip.pageBuy(step.ref, res.bought || step.amount, step.price);
       else Trip.walletMoved();
       PlanSync.changed();
       Panel.refresh("plan");
@@ -8982,16 +9490,16 @@ const Assist = (() => {
     if (res.ok) {
       if (step.act === "buy") markVisit({ bought: true });
       if (step.act === "use" && Page.mode() === "flight") markVisit({ hospUsed: true });
-      if (step.act === "use") markVisit({ medOut: med });
+      if (step.act === "use") markVisit({ medOut: med, medKey: med ? stay : null });
       if (med && before.wallet) {
         markVisit({ medAt: Date.now(),
                     medFree: Math.max(0, before.wallet.capacity - before.wallet.taken) + 1 });
       }
-      settle = { until: Date.now() + SETTLE_MS, key: pageKey() };
+      const held = { until: Date.now() + SETTLE_MS, key: null };
+      settle = held;
+      setTimeout(() => { held.key = pageKey(); }, 0);
       setTimeout(paint, SETTLE_MS + 50);
-      try { window.dispatchEvent(new Event("focus")); } catch {}
       if (step.act === "use") Tracker.poke();
-      if (step.act === "fly") setTimeout(() => window.location.reload(), 400);
     } else if (step.act === "buy" && visit().medOut && kit.med
                && (facts().carried || []).includes(kit.med.name)) {
       markVisit({ medOut: false });
@@ -9069,13 +9577,26 @@ const Assist = (() => {
     bar.innerHTML = `
       <div class="oa-line"><span class="oa-brand">Torn Oracle</span><span class="oa-note"></span></div>
       <div class="oa-acts"><button type="button" class="oa-go"></button>
-        <button type="button" class="oa-skip">Skip</button></div>
+        <button type="button" class="oa-skip">Skip</button>
+        <button type="button" class="oa-refresh" aria-label="Refresh" title="Refresh"><svg viewBox="0 0 24 24"
+          width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66L20 9"/>
+          <path d="M20 4v5h-5"/></svg></button></div>
       <div class="oa-msg" role="status"></div>`;
     bar.querySelector(".oa-go").addEventListener("click", (ev) => {
       if (!ev.isTrusted) return;
       press();
     });
     bar.querySelector(".oa-skip").addEventListener("click", skip);
+    const refresh = bar.querySelector(".oa-refresh");
+    refresh.addEventListener("click", (ev) => {
+      if (!ev.isTrusted) return;
+      refresh.classList.remove("is-spin");
+      void refresh.offsetWidth;
+      refresh.classList.add("is-spin");
+      Page.refreshTorn();
+    });
+    refresh.addEventListener("animationend", () => refresh.classList.remove("is-spin"));
     return bar;
   }
 
@@ -9087,9 +9608,9 @@ const Assist = (() => {
       Env.write(VISIT_KEY, v.sell ? { sell: v.sell } : {});
     }
     if (mode === "flight" && (v.bought || v.medOut)) markVisit({ bought: false, medOut: false });
-    const packed = Page.travelInventory();
-    if (packed && (mode === "agency" || (mode === "flight" && Trip.get().phase === "outbound"))) {
-      notePacked(packed.items);
+    const seen = corrected(pageNow(mode));
+    if (seen.inv && (mode === "agency" || (mode === "flight" && Trip.get().phase === "outbound"))) {
+      notePacked(seen.inv.items);
     }
     if (mode === "abroad" && v.hospUsed) markVisit({ hospUsed: false });
     if (mode === "abroad" && !focused()) {
@@ -9097,14 +9618,9 @@ const Assist = (() => {
       return;
     }
     loadBest();
-    const f = facts();
+    const f = facts(seen);
+    if (mode === "agency" && f.kit && (f.kit.extras || []).length) loadCatalogue();
     const step = decide(f);
-    const kit = f.kit || {};
-    if ((mode === "flight" || mode === "abroad") && (kit.hosp || kit.med || f.sell.length)
-        && !slots && !slotsLoading
-        && focused()) {
-      readSlots();
-    }
     if (mode === "abroad") {
       StockShare.offer();
       noticeReady(step);
@@ -9122,6 +9638,7 @@ const Assist = (() => {
     const view = step ? {
       dark: Page.darkMode(),
       ready: !!step.ready && !!step.act,
+      watch: !!step.watch && !busy,
       label: busy ? "Working…" : step.label,
       disabled: busy || !step.act || settling(),
       skip: !!step.skip && !busy,
@@ -9137,6 +9654,7 @@ const Assist = (() => {
     bar.hidden = false;
     bar.classList.toggle("o-dark", view.dark);
     bar.classList.toggle("is-ready", view.ready);
+    bar.classList.toggle("is-watch", view.watch);
     const btn = bar.querySelector(".oa-go");
     btn.textContent = view.label;
     btn.disabled = view.disabled;
@@ -9172,7 +9690,7 @@ const Assist = (() => {
   function mount() {
     const first = !bar;
     if (first) build();
-    if (first && Page.mode() === "abroad" && Page.hospitalLayout() && visit().medOut) {
+    if (first && Page.mode() === "abroad" && hospKey() && visit().medOut) {
       markVisit({ medOut: false });
     }
     if (Page.mode() === "other") {
@@ -9187,6 +9705,8 @@ const Assist = (() => {
   function onObservation(obs) {
     if (!obs || !obs.state) return;
     observed = { at: obs.at || Date.now(), state: obs.state };
+    const key = hospKey();
+    if (key && obs.state === "Hospital") apiHosp = { key, at: observed.at };
     paint();
   }
 
@@ -9303,6 +9823,8 @@ const ViewAssist = (() => {
         <div class="o-field"><span class="o-field-label">Med-out items to pack</span>
           <input type="number" data-kit="meds" min="0" max="${Settings.MAX_MEDS}" step="1"
                  value="${kit.meds}"></div>
+        <p class="o-note">${toggle("fork_kit_faction",
+          "When you have none, take kit items from your faction's armoury")}</p>
       </div>
       <div class="o-group"><h4>Other items to pack</h4>
         ${kit.extras.length ? `<div class="o-chips">${kit.extras.map((e) => `
@@ -10214,10 +10736,11 @@ Env.ready().then(function boot() {
 
   let readForm = () => {};
   Page.watch((next) => { applyMode(next); placePanel(); readForm(); });
-  Page.followLink();
+  const followLink = () => { Page.followLink(); Assist.paint(); };
+  followLink();
   new MutationObserver(() => { Panel.applyTheme(); Assist.paint(); })
     .observe(document.body, { attributes: true, attributeFilter: ["class"] });
-  window.addEventListener("hashchange", Page.followLink);
+  window.addEventListener("hashchange", followLink);
 
   Page.onTravelPress((code) => {
     if (!Settings.get("confirm_travel")) return true;
