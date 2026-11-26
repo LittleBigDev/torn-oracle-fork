@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Oracle: Travel (fork Workaround)
 // @namespace    workaround.oracle-fork
-// @version      2.6.16-fork.1
+// @version      2.6.16-fork.2
 // @downloadURL  https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @updateURL    https://raw.githubusercontent.com/LittleBigDev/torn-oracle-fork/main/torn-oracle-fork.user.js
 // @description  Fork de Torn Oracle: Travel 2.6.16 (Ruinbringer) : profits calculés sur le meilleur canal de vente de chaque objet (bazaar, ville), alerte d'export sur toutes les pages.
@@ -6186,7 +6186,8 @@ const ViewPlan = (() => {
     const lines = draft || startingLines(i);
 
     const listed = listedRows(i).slice().sort((a, b) => a.name.localeCompare(b.name));
-    const known = [{ itemId: leg.item_id, name: leg.item_name, cost: leg.unit_cost }];
+    const here = listed.find((r) => r.itemId === leg.item_id);
+    const known = [here || { itemId: leg.item_id, name: leg.item_name, cost: leg.unit_cost }];
     if (rt.item) known.push({ itemId: rt.item.id, name: rt.item.name, cost: rt.item.cost });
     for (const e of Trip.extras(rt)) known.push({ itemId: e.id, name: e.name, cost: e.cost });
     const choices = [];
